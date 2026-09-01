@@ -38,11 +38,19 @@ export function ConceptCard({ onClose }: { onClose: () => void }) {
             </dd>
           </div>
           <div className="rounded-2xl bg-slate-50 p-3">
-            <dt className="font-semibold text-slate-900">왜 그럴까?</dt>
+            <dt className="font-semibold text-slate-900">왜 홀수점 ÷ 2 일까?</dt>
             <dd className="mt-1">
-              지나가는 점은 들어온 선 하나와 나가는 선 하나를 짝지어 쓴다. 그래서 중간에 지나는
-              점의 차수는 반드시 짝수다. 짝이 맞지 않는 홀수점은 출발점이나 도착점밖에 될 수 없고,
-              한붓그리기에는 출발점과 도착점이 하나씩뿐이다.
+              붓 <b>한 획</b>에서 홀수점이 될 수 있는 자리는 <b>시작점과 끝점 둘뿐</b>이다.
+              중간에 지나가는 점은 들어온 선 하나와 나간 선 하나를 늘 짝지어 쓰니 짝수가 된다.
+              그래서 한 획이 감당할 수 있는 홀수점은 최대 2개이고, 홀수점이 4개면 획이 최소 2번
+              필요하다. 홀수점 하나하나가 어느 획의 시작점이나 끝점을 맡는 셈이다.
+            </dd>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <dt className="font-semibold text-slate-900">홀수점은 항상 짝수 개</dt>
+            <dd className="mt-1">
+              선 하나는 양 끝 점의 차수를 1씩 올린다. 그래서 모든 차수를 더하면 언제나 선 개수의
+              두 배, 곧 짝수다. 홀수점이 홀수 개일 수는 없고, 그래서 ÷ 2가 늘 딱 떨어진다.
             </dd>
           </div>
         </dl>

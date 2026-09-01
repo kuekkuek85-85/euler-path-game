@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { StageRecord } from '../../types';
 import {
-  type FeedRow,
   type RankingRow,
   type StageTimeRow,
   subscribeClass,
   subscribeClassBest,
-  subscribeFeed,
   subscribeRanking,
   subscribeStageTimes,
 } from '../../lib/repository';
-import { MAIN_STAGES, STAGE_BY_ID, STAGES } from '../../data/stages';
-import { displayName, formatDuration, formatRelativeTime, shortNo } from '../../lib/format';
+import { MAIN_STAGES, STAGES } from '../../data/stages';
+import { displayName, formatDuration, shortNo } from '../../lib/format';
 import { Stars } from '../StageCard';
 
 const EMPTY_HINT = '아직 기록이 없어요. 먼저 도전해 보세요!';
@@ -84,7 +82,7 @@ export function RankingTab({
 
 /** 탭 2 · 스테이지별 최단 시간 — 스테이지를 고르고 상위 10명. */
 export function StageTimeTab({ masking }: { masking: boolean }) {
-  const drawStages = useMemo(() => STAGES.filter((s) => s.type === 'DRAW' && !s.generated), []);
+  const drawStages = useMemo(() => STAGES.filter((s) => s.type === 'DRAW'), []);
   const [stageId, setStageId] = useState(drawStages[0]?.id ?? 'S01');
   const [rows, setRows] = useState<StageTimeRow[]>([]);
 
@@ -246,35 +244,5 @@ export function ClassTab({
         </ol>
       )}
     </div>
-  );
-}
-
-/** 탭 4 · 실시간 피드 — 최근 클리어 20건. */
-export function FeedTab({ masking }: { masking: boolean }) {
-  const [rows, setRows] = useState<FeedRow[]>([]);
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => subscribeFeed(20, setRows), []);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  if (rows.length === 0) return <Empty />;
-
-  return (
-    <RowShell>
-      {rows.map((row) => (
-        <li key={row.id} className="rounded-2xl bg-white px-3 py-2.5 text-sm">
-          <p className="text-slate-800">
-            <b>
-              {row.classId}반 {displayName(row.name, masking)}
-            </b>{' '}
-            학생이 <b>{STAGE_BY_ID[row.stageId]?.name ?? row.stageId}</b>을(를) 깼습니다!
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">{formatRelativeTime(row.createdAt, now)}</p>
-        </li>
-      ))}
-    </RowShell>
   );
 }

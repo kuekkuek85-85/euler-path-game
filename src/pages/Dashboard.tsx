@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useSession } from '../state/sessionStore';
-import { ClassTab, FeedTab, RankingTab, StageTimeTab } from '../components/Dashboard/DashboardTabs';
+import { ClassTab, RankingTab, StageTimeTab } from '../components/Dashboard/DashboardTabs';
 import { classIdOf } from '../lib/format';
 
-type TabId = 'ranking' | 'stage' | 'class' | 'feed';
+type TabId = 'ranking' | 'stage' | 'class';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'ranking', label: '전체 랭킹' },
   { id: 'stage', label: '최단 시간' },
   { id: 'class', label: '우리 반' },
-  { id: 'feed', label: '실시간' },
 ];
 
 /**
@@ -18,6 +17,10 @@ const TABS: { id: TabId; label: string }[] = [
  * onSnapshot 리스너는 이 화면에서만 살아 있고, 나가면 해제된다 (PRD 5.4 / 7.2).
  * 각 탭 컴포넌트가 마운트될 때 구독하고 언마운트될 때 해제하므로
  * 보고 있는 탭 하나만 읽기를 발생시킨다.
+ *
+ * PRD 5.4의 "탭 4 · 실시간 피드"는 뺐다 (2026-09-01 작성자 결정).
+ * plays 컬렉션을 통째로 실시간 구독해 클리어가 나올 때마다 읽기가 쌓이는,
+ * 네 탭 중 부하가 가장 큰 화면이었다.
  */
 export function Dashboard() {
   const { identity, config, remoteEnabled } = useSession();
@@ -45,7 +48,7 @@ export function Dashboard() {
         </p>
       )}
 
-      <nav className="mt-3 grid grid-cols-4 gap-1 rounded-2xl bg-slate-100 p-1">
+      <nav className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -69,7 +72,6 @@ export function Dashboard() {
         {tab === 'class' && (
           <ClassTab masking={masking} defaultClassId={classIdOf(identity.studentNo)} />
         )}
-        {tab === 'feed' && <FeedTab masking={masking} />}
       </section>
 
       {masking && (

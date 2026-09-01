@@ -80,16 +80,6 @@ export function formatClock(ms: number): string {
   return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
-export function formatRelativeTime(timestamp: number, now = Date.now()): string {
-  const diffSec = Math.max(0, Math.floor((now - timestamp) / 1000));
-  if (diffSec < 10) return '방금';
-  if (diffSec < 60) return `${diffSec}초 전`;
-  const min = Math.floor(diffSec / 60);
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  return `${hour}시간 전`;
-}
-
 /** CSV 셀 이스케이프. 쉼표·따옴표·줄바꿈이 있으면 큰따옴표로 감싼다. */
 export function csvCell(value: string | number | boolean): string {
   const text = String(value);

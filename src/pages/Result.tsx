@@ -16,7 +16,6 @@ interface ResultState {
   totalScore: number;
   clearMessage?: string;
   judge?: boolean;
-  generated?: boolean;
 }
 
 /** F4 · 결과 — 별점·점수·소요시간과 다음 행동 (PRD 5.1). */
@@ -120,7 +119,7 @@ export function Result() {
           to={`/play/${state.stageId}`}
           className="block rounded-2xl bg-white py-3.5 text-center font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200"
         >
-          {state.generated ? '새 도형으로 다시' : '다시 도전'}
+          다시 도전
         </Link>
         <Link
           to="/stages"

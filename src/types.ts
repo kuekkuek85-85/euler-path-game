@@ -50,8 +50,6 @@ export interface Stage {
   answer?: JudgeAnswer;
   /** JUDGE 정답 후 보여주는 해설. */
   explanation?: string;
-  /** B02처럼 매번 새로 생성되는 스테이지. */
-  generated?: boolean;
 }
 
 export interface StageRecord {

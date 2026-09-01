@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { Stage } from '../types';
 import { getStage } from '../data/stages';
-import { generateCircuitStage } from '../lib/generator';
 import { oddNodes } from '../lib/graph';
 import { scoreForStage } from '../lib/scoring';
 import { formatClock } from '../lib/format';
-import { HINT_LIMIT, useGameEngine } from '../hooks/useGameEngine';
+import { useGameEngine } from '../hooks/useGameEngine';
 import { usePointerDraw } from '../hooks/usePointerDraw';
 import { GameCanvas } from '../components/GameCanvas';
 import { Countdown } from '../components/Countdown';
@@ -18,31 +17,17 @@ import { JudgeBoard } from './JudgeBoard';
 export function Play() {
   const { stageId = '' } = useParams();
   const { identity, isUnlocked } = useSession();
-  const template = getStage(stageId);
-  // B02는 진입할 때마다 새 도형을 만든다.
-  const [instance, setInstance] = useState(0);
-  const stage = useMemo<Stage | undefined>(() => {
-    if (!template) return undefined;
-    if (!template.generated) return template;
-    void instance;
-    return generateCircuitStage(template);
-  }, [template, instance]);
+  const stage = getStage(stageId);
 
   if (!identity) return <Navigate to="/" replace />;
-  if (!template || !stage) return <Navigate to="/stages" replace />;
-  if (!isUnlocked(template.id)) return <Navigate to="/stages" replace />;
+  if (!stage) return <Navigate to="/stages" replace />;
+  if (!isUnlocked(stage.id)) return <Navigate to="/stages" replace />;
 
   if (stage.type === 'JUDGE') return <JudgeBoard stage={stage} />;
-  return (
-    <DrawBoard
-      key={`${stage.id}-${instance}`}
-      stage={stage}
-      onRegenerate={template.generated ? () => setInstance((n) => n + 1) : undefined}
-    />
-  );
+  return <DrawBoard key={stage.id} stage={stage} />;
 }
 
-function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () => void }) {
+function DrawBoard({ stage }: { stage: Stage }) {
   const navigate = useNavigate();
   const { submitResult, config } = useSession();
   const engine = useGameEngine(stage);
@@ -56,8 +41,9 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
   const submitted = useRef(false);
   const wasStuck = useRef(false);
 
-  // PRD 3.3: 홀수점 보기는 3단계부터 기본 해금, 그 전에는 교사 설정으로 연다.
-  const oddViewAllowed = stage.tier >= 3 || config.oddViewUnlocked;
+  // 홀수점 보기는 기본으로 숨긴다. 교사가 "홀수점 보기 열기"를 켰을 때만 나타난다
+  // (수업 운영표의 "정리 1 — 홀수점 개념 설명" 시점에 여는 용도).
+  const oddViewAllowed = config.oddViewUnlocked;
 
   const onNodeHit = useCallback(
     (nodeId: string) => {
@@ -158,23 +144,9 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
         improved,
         totalScore,
         clearMessage: stage.clearMessage,
-        generated: Boolean(onRegenerate),
       },
     });
-  }, [engine, navigate, onRegenerate, stage, submitResult]);
-
-  // PRD 7.1: 노트북 단축키
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) return;
-      // 되돌리기(Z)는 한 번에 그리기 모드에서 쓸 수 없어 뺐다 — 누르려면 붓을 떼야 한다.
-      if (event.key.toLowerCase() === 'r') engine.reset();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [engine]);
-
-  const hintsLeft = HINT_LIMIT - engine.hintCount;
+  }, [engine, navigate, stage, submitResult]);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-3 pb-4 pt-3 landscape:max-w-4xl landscape:flex-row landscape:items-center landscape:gap-4">
@@ -273,46 +245,23 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
         )}
       </div>
 
-      <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
-        <div className="grid grid-cols-3 gap-2 landscape:grid-cols-1">
+      {/*
+        힌트·다시하기 버튼은 학생이 스스로 고민하도록 감췄다 (2026-09-01 작성자 결정).
+        붓을 뗐을 때의 "다시 그리기"는 캔버스 오버레이에 남아 있어 복구는 언제든 가능하다.
+        홀수점 보기는 교사가 "홀수점 보기 열기"를 켰을 때만 나타난다 — 수업 운영표의
+        "정리 1 · 홀수점 개념 설명" 시점에 여는 용도다.
+      */}
+      {oddViewAllowed && (
+        <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
           <ControlButton
-            label="힌트"
-            sub={`${hintsLeft}회`}
-            icon="💡"
-            onClick={engine.hint}
-            disabled={hintsLeft <= 0}
-          />
-          <ControlButton
-            label="다시하기"
-            sub="R"
-            icon="⟳"
-            onClick={engine.reset}
-            highlight={engine.status === 'stuck' || engine.status === 'broken'}
-          />
-          <ControlButton
-            label="홀수점"
-            sub={oddViewAllowed ? (oddView ? '켜짐' : '꺼짐') : '잠김'}
+            label="홀수점 보기"
+            sub={oddView ? '켜짐' : '꺼짐'}
             icon="◉"
             onClick={() => setOddView((v) => !v)}
-            disabled={!oddViewAllowed}
-            active={oddView && oddViewAllowed}
+            active={oddView}
           />
         </div>
-
-        {onRegenerate && (
-          <button
-            type="button"
-            onClick={onRegenerate}
-            className="mt-2 w-full rounded-2xl bg-slate-800 py-2.5 text-sm font-semibold text-white"
-          >
-            새 도형 받기
-          </button>
-        )}
-
-        <p className="mt-2 text-center text-[11px] text-slate-500">
-힌트 -50점 · 다시하기 -20점
-        </p>
-      </div>
+      )}
 
       <Toast message={toast?.message ?? null} tone={toast?.tone} onDismiss={() => setToast(null)} />
       {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}

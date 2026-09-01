@@ -33,9 +33,14 @@ function ringLayout(count: number): StageNode[] {
 }
 
 /**
- * B02 "도전 회로"용 무작위 스테이지.
+ * 도전 회로(B02~B04) 도형을 만드는 **설계 시점 도구**.
  * 서로 다른 사이클을 간선이 겹치지 않게 합치므로 모든 차수가 짝수로 유지된다
  * → 항상 오일러 회로가 존재한다 (PRD 4.2 보너스).
+ *
+ * 예전에는 플레이할 때마다 새 도형을 뽑았지만, 2026-09-01 작성자 결정으로
+ * 고정 미션 3개로 바꿨다. 지금 stages.json의 B02·B03·B04는 각각
+ * makeRng(2)·makeRng(7)·makeRng(1)로 이 함수가 만든 결과를 그대로 심은 것이다.
+ * 도형을 새로 뽑고 싶으면 다른 시드로 다시 돌려 stages.json에 넣으면 된다.
  */
 export function generateCircuitStage(template: Stage, rng: () => number = Math.random): Stage {
   for (let attempt = 0; attempt < 40; attempt += 1) {

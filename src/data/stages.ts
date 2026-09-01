@@ -8,8 +8,8 @@ export const STAGE_BY_ID: Record<string, Stage> = Object.fromEntries(
   STAGES.map((stage) => [stage.id, stage]),
 );
 
-/** B02처럼 매번 새로 생성되는 스테이지는 정적 검증 대상이 아니다. */
-export const STATIC_STAGES = STAGES.filter((stage) => !stage.generated);
+/** 모든 스테이지가 고정 데이터다. 전부 정적 검증 대상. */
+export const STATIC_STAGES = STAGES;
 
 export const MAIN_STAGES = STAGES.filter((stage) => !stage.bonus);
 export const BONUS_STAGES = STAGES.filter((stage) => stage.bonus);

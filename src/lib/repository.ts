@@ -346,15 +346,6 @@ export interface StageTimeRow {
   stars: number;
 }
 
-export interface FeedRow {
-  id: string;
-  studentNo: string;
-  name: string;
-  classId: string;
-  stageId: string;
-  createdAt: number;
-}
-
 function toRankingRow(id: string, data: Record<string, unknown>): RankingRow {
   const profile = normalizeProfile(id, data);
   return {
@@ -476,44 +467,6 @@ export function subscribeClassBest(
             studentNo: d.id,
             best: (d.data().best as Record<string, StageRecord>) ?? {},
           })),
-        ),
-      (error) => onError?.(error),
-    );
-  });
-}
-
-export function subscribeFeed(
-  count: number,
-  onData: (rows: FeedRow[]) => void,
-  onError?: (error: unknown) => void,
-): Unsubscribe {
-  return lazySubscribe(async () => {
-    const db = await getDb();
-    if (!db) {
-      onData([]);
-      return null;
-    }
-    const { collection, limit, onSnapshot, orderBy, query, where } = await firestoreApi();
-    return onSnapshot(
-      query(
-        collection(db, 'plays'),
-        where('cleared', '==', true),
-        orderBy('createdAt', 'desc'),
-        limit(count),
-      ),
-      (snapshot) =>
-        onData(
-          snapshot.docs.map((d) => {
-            const data = d.data();
-            return {
-              id: d.id,
-              studentNo: String(data.studentNo ?? ''),
-              name: String(data.name ?? ''),
-              classId: String(data.classId ?? ''),
-              stageId: String(data.stageId ?? ''),
-              createdAt: toMillis(data.createdAt) ?? Date.now(),
-            };
-          }),
         ),
       (error) => onError?.(error),
     );

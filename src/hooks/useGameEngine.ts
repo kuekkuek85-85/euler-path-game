@@ -2,7 +2,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { GameStatus, Stage } from '../types';
 import { adjacency, availableEdges, hintEdges, validStartNodes } from '../lib/graph';
 
-export type MoveResult = 'start' | 'moved' | 'cleared' | 'rejected';
+/**
+ * 'resume' — 손을 뗐다가 현재 점을 다시 누른 경우. 잘못한 것이 아니므로
+ *            'rejected'와 달리 흔들림·진동 피드백을 주지 않는다.
+ */
+export type MoveResult = 'start' | 'moved' | 'cleared' | 'rejected' | 'resume';
 
 export interface GameEngine {
   stage: Stage;
@@ -88,7 +92,8 @@ export function useGameEngine(stage: Stage): GameEngine {
         setCurrentNode(nodeId);
         return 'start';
       }
-      if (nodeId === currentNode) return 'rejected';
+      // 이어 그리려고 현재 점을 다시 누른 것. 오조작이 아니다.
+      if (nodeId === currentNode) return 'resume';
 
       const option = (adj.get(currentNode) ?? []).find(
         (i) => i.to === nodeId && !usedEdgeSet.has(i.edgeId),

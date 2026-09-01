@@ -40,6 +40,8 @@ export function usePointerDraw(
   nodes: StageNode[],
   onNodeHit: (nodeId: string) => void,
   enabled = true,
+  /** 붓을 뗐을 때(포인터 업·취소) 호출된다. 한붓그리기 판정에 쓴다. */
+  onStrokeEnd?: () => void,
 ): PointerDraw {
   const svgRef = useRef<SVGSVGElement>(null);
   const [pixelSize, setPixelSize] = useState(360);
@@ -130,17 +132,21 @@ export function usePointerDraw(
     [enabled, handlePoint],
   );
 
-  const endDrag = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    if (draggingId.current !== event.pointerId) return;
-    draggingId.current = null;
-    lastNode.current = null;
-    setPointerAt(null);
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      /* 이미 해제된 경우 */
-    }
-  }, []);
+  const endDrag = useCallback(
+    (event: ReactPointerEvent<SVGSVGElement>) => {
+      if (draggingId.current !== event.pointerId) return;
+      draggingId.current = null;
+      lastNode.current = null;
+      setPointerAt(null);
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        /* 이미 해제된 경우 */
+      }
+      onStrokeEnd?.();
+    },
+    [onStrokeEnd],
+  );
 
   return {
     svgRef,

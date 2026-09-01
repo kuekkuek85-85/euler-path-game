@@ -73,7 +73,18 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
     [counting, engine],
   );
 
-  const draw = usePointerDraw(stage.nodes, onNodeHit, !counting && engine.status !== 'cleared');
+  // 붓을 떼면 한붓그리기가 아니므로 실패로 판정한다.
+  const onStrokeEnd = useCallback(() => {
+    if (counting) return;
+    engine.breakStroke();
+  }, [counting, engine]);
+
+  const draw = usePointerDraw(
+    stage.nodes,
+    onNodeHit,
+    !counting && engine.status !== 'cleared' && engine.status !== 'broken',
+    onStrokeEnd,
+  );
 
   // 경과 시간 표시. 카운트다운이 끝난 뒤부터 흐른다.
   useEffect(() => {
@@ -100,9 +111,15 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
         tone: 'warn',
       });
     } else {
-      setToast({ message: '이 길로는 다 못 지나가요. 되돌리기를 눌러 볼까요?', tone: 'warn' });
+      setToast({ message: '이 길로는 다 못 지나가요. 다시 그려 볼까요?', tone: 'warn' });
     }
   }, [engine.status, stage, stuckStreak]);
+
+  // 붓을 뗐을 때 — 안내는 캔버스 위 오버레이가 하므로 진동만 준다.
+  useEffect(() => {
+    if (engine.status !== 'broken') return;
+    navigator.vibrate?.([15, 40, 15]);
+  }, [engine.status]);
 
   // 클리어 → 결과 화면
   useEffect(() => {
@@ -150,9 +167,8 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement) return;
-      const key = event.key.toLowerCase();
-      if (key === 'z') engine.undo();
-      if (key === 'r') engine.reset();
+      // 되돌리기(Z)는 한 번에 그리기 모드에서 쓸 수 없어 뺐다 — 누르려면 붓을 떼야 한다.
+      if (event.key.toLowerCase() === 'r') engine.reset();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -225,18 +241,40 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
             setCounting(false);
             engine.beginTimer();
           }} />}
+
+          {/* 붓을 뗀 순간 — 한붓그리기 실패. 다시 그리기 외에는 길이 없다. */}
+          {engine.status === 'broken' && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-3xl bg-white/90 px-6 text-center backdrop-blur-sm">
+              <p className="animate-pop-in text-4xl" aria-hidden="true">
+                ✏️
+              </p>
+              <p className="text-lg font-bold text-slate-900">붓을 뗐어요</p>
+              <p className="text-sm leading-relaxed text-slate-600">
+                한붓그리기는 시작부터 끝까지 <b>한 번에 이어서</b> 그려야 해요.
+                <br />
+                선 {engine.totalEdges - engine.remainingEdges}개까지 잘 갔어요. 다시 해볼까요?
+              </p>
+              <button
+                type="button"
+                onClick={engine.reset}
+                className="mt-1 rounded-2xl bg-blue-600 px-8 py-3 text-base font-bold text-white"
+              >
+                다시 그리기
+              </button>
+            </div>
+          )}
         </div>
 
         {engine.currentNode === null && !counting && (
           <p className="mt-2 text-center text-sm text-slate-600 landscape:text-xs">
-            시작할 점을 누르세요. 그다음 이어진 점으로 손가락을 끌면 선이 그려집니다.
+            시작할 점을 누른 채 이어진 점으로 끌어 보세요.
+            <b className="text-slate-800"> 도중에 손을 떼면 처음부터 다시</b> 그려야 해요.
           </p>
         )}
       </div>
 
       <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
-        <div className="grid grid-cols-4 gap-2 landscape:grid-cols-1">
-          <ControlButton label="되돌리기" sub="Z" icon="↩" onClick={engine.undo} highlight={engine.status === 'stuck'} />
+        <div className="grid grid-cols-3 gap-2 landscape:grid-cols-1">
           <ControlButton
             label="힌트"
             sub={`${hintsLeft}회`}
@@ -244,7 +282,13 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
             onClick={engine.hint}
             disabled={hintsLeft <= 0}
           />
-          <ControlButton label="다시하기" sub="R" icon="⟳" onClick={engine.reset} />
+          <ControlButton
+            label="다시하기"
+            sub="R"
+            icon="⟳"
+            onClick={engine.reset}
+            highlight={engine.status === 'stuck' || engine.status === 'broken'}
+          />
           <ControlButton
             label="홀수점"
             sub={oddViewAllowed ? (oddView ? '켜짐' : '꺼짐') : '잠김'}
@@ -266,7 +310,7 @@ function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () =>
         )}
 
         <p className="mt-2 text-center text-[11px] text-slate-500">
-          되돌리기 -10점 · 힌트 -50점 · 다시하기 -20점
+힌트 -50점 · 다시하기 -20점
         </p>
       </div>
 

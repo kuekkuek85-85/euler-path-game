@@ -27,6 +27,8 @@ export interface GameEngine {
   startCandidates: string[];
   beginTimer: () => void;
   selectNode: (nodeId: string) => MoveResult;
+  /** 붓을 뗐음을 알린다. 선을 그리던 중이었다면 실패로 판정한다. */
+  breakStroke: () => void;
   undo: () => void;
   reset: () => void;
   hint: () => void;
@@ -48,6 +50,8 @@ export function useGameEngine(stage: Stage): GameEngine {
   const [resetCount, setResetCount] = useState(0);
   const [hintNodes, setHintNodes] = useState<string[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  /** 선을 그리던 중 붓을 떼서 실패한 상태. 다시하기로만 벗어난다. */
+  const [strokeBroken, setStrokeBroken] = useState(false);
   /** 방문 노드 이력. undo에서 이전 노드로 정확히 되돌리기 위해 따로 쌓는다. */
   const nodeHistory = useRef<string[]>([]);
 
@@ -59,10 +63,11 @@ export function useGameEngine(stage: Stage): GameEngine {
 
   const status: GameStatus = useMemo(() => {
     if (usedEdges.length === totalEdges && totalEdges > 0) return 'cleared';
+    if (strokeBroken) return 'broken';
     if (currentNode === null) return 'ready';
     const open = (adj.get(currentNode) ?? []).some((i) => !usedEdgeSet.has(i.edgeId));
     return open ? 'playing' : 'stuck';
-  }, [adj, currentNode, totalEdges, usedEdgeSet, usedEdges.length]);
+  }, [adj, currentNode, strokeBroken, totalEdges, usedEdgeSet, usedEdges.length]);
 
   const beginTimer = useCallback(() => {
     setStartedAt((previous) => previous ?? Date.now());
@@ -86,6 +91,8 @@ export function useGameEngine(stage: Stage): GameEngine {
    */
   const selectNode = useCallback(
     (nodeId: string): MoveResult => {
+      // 붓을 뗀 뒤에는 다시하기 전까지 아무 입력도 받지 않는다.
+      if (strokeBroken) return 'rejected';
       setHintNodes([]);
       if (currentNode === null) {
         nodeHistory.current = [nodeId];
@@ -106,8 +113,26 @@ export function useGameEngine(stage: Stage): GameEngine {
       setUsedEdges(next);
       return next.length === totalEdges ? 'cleared' : 'moved';
     },
-    [adj, currentNode, totalEdges, usedEdgeSet, usedEdges],
+    [adj, currentNode, strokeBroken, totalEdges, usedEdgeSet, usedEdges],
   );
+
+  /**
+   * 붓을 뗐다. 한붓그리기는 한 번에 이어 그려야 하므로 실패로 판정한다.
+   * 다만 아직 선을 하나도 긋지 않았다면(시작점만 눌렀다 뗀 경우) 잘못 누른 것으로 보고
+   * 조용히 시작 전 상태로 되돌린다 — 실패로 치지 않는다.
+   */
+  const breakStroke = useCallback(() => {
+    if (strokeBroken) return;
+    if (currentNode === null) return;
+    if (usedEdges.length === totalEdges && totalEdges > 0) return; // 이미 클리어
+    if (usedEdges.length === 0) {
+      nodeHistory.current = [];
+      setCurrentNode(null);
+      return;
+    }
+    setHintNodes([]);
+    setStrokeBroken(true);
+  }, [currentNode, strokeBroken, totalEdges, usedEdges.length]);
 
   /** 마지막 한 선을 취소한다. 시작점만 고른 상태면 시작점 선택도 되돌린다. */
   const undo = useCallback(() => {
@@ -132,6 +157,7 @@ export function useGameEngine(stage: Stage): GameEngine {
     setCurrentNode(null);
     setUsedEdges([]);
     setHintNodes([]);
+    setStrokeBroken(false);
     setResetCount((c) => c + 1);
   }, []);
 
@@ -168,6 +194,7 @@ export function useGameEngine(stage: Stage): GameEngine {
     startCandidates,
     beginTimer,
     selectNode,
+    breakStroke,
     undo,
     reset,
     hint,

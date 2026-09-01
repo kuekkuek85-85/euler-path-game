@@ -102,7 +102,11 @@ export interface GlobalConfig {
   updatedAt?: number;
 }
 
-export type GameStatus = 'ready' | 'playing' | 'stuck' | 'cleared';
+/**
+ * 'broken' — 선을 그리던 중 붓(손가락·마우스)을 뗀 상태.
+ *            한붓그리기는 한 번에 이어 그려야 하므로 실패로 판정한다.
+ */
+export type GameStatus = 'ready' | 'playing' | 'stuck' | 'broken' | 'cleared';
 
 export interface GameState {
   stageId: string;

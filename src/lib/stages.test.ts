@@ -23,20 +23,28 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     }
   });
 
-  it('본편 12스테이지 + 보너스 4스테이지로 구성된다', () => {
+  it('본편 12스테이지 + 보너스 6스테이지로 구성된다', () => {
     expect(MAIN_STAGES).toHaveLength(12);
-    // B01 판별 미션 + 고정 도전 회로 3종(B02~B04)
-    expect(BONUS_STAGES).toHaveLength(4);
+    // B01 판별 미션 + 고정 도전 회로 5종(B02~B06)
+    expect(BONUS_STAGES).toHaveLength(6);
   });
 
-  it('도전 회로 3종은 모두 짝수점뿐인 오일러 회로다', () => {
-    for (const id of ['B02', 'B03', 'B04']) {
+  it('도전 회로 5종은 모두 짝수점뿐인 오일러 회로다', () => {
+    for (const id of ['B02', 'B03', 'B04', 'B05', 'B06']) {
       const stage = STAGES.find((s) => s.id === id)!;
       expect(oddNodes(stage)).toEqual([]);
       expect(eulerStatus(stage)).toBe('circuit');
       expect(stage.edges.length).toBeGreaterThanOrEqual(12);
       expect(solve(stage)).toHaveLength(stage.edges.length);
     }
+  });
+
+  it('도전 회로는 간선 수가 뒤로 갈수록 늘어난다', () => {
+    const counts = ['B02', 'B03', 'B04', 'B05', 'B06'].map(
+      (id) => STAGES.find((s) => s.id === id)!.edges.length,
+    );
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+    expect(counts).toEqual([12, 13, 14, 16, 18]);
   });
 
   it.each(STATIC_STAGES.map((s) => [s.id, s] as const))(

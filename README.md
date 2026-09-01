@@ -173,12 +173,12 @@ PIN은 코드에 없다. 환경변수 `VITE_TEACHER_PIN`으로만 주입된다.
 
 ```
 src/
-  data/stages.json      스테이지 데이터 (본편 12 + 보너스 4)
+  data/stages.json      스테이지 데이터 (본편 12 + 보너스 6)
   data/stages.ts        로더 + 개발 모드 자가 검사
   lib/
     graph.ts            차수·홀수점·연결성·오일러 판정·Hierholzer·힌트
     geometry.ts         간선 SVG 경로 (직선 / 2차 베지어)
-    generator.ts        도전 회로(B02~B04) 생성 — 설계 시점 도구
+    generator.ts        도전 회로(B02~B06) 생성 — 설계 시점 도구
     scoring.ts          점수·별점 산식
     format.ts           학번 검증, 이름 마스킹, 시간 표기, CSV
     firebase.ts         동적 import 기반 초기화 + 익명 인증

@@ -87,6 +87,55 @@ export function eulerStatus(graph: GraphLike): EulerStatus {
   return 'impossible';
 }
 
+/**
+ * 모든 간선을 k획으로 덮는 실제 해를 만든다. 못 만들면 null.
+ *
+ * 원리: 홀수점이 2k개일 때, 그 중 2k-2개를 짝지어 "가상의 선"으로 이어 주면
+ * 홀수점이 2개만 남아 한붓그리기가 된다. 그 한붓 경로를 찾은 뒤 가상의 선 자리에서
+ * 잘라내면 k개의 획이 나온다. 각 획의 양 끝이 원래 홀수점 하나씩을 맡는다.
+ *
+ * 반환값은 획별 edge id 배열이다. 한붓 스테이지 검증(AC-04)의 두붓 판이다.
+ */
+export function solveInStrokes(graph: GraphLike): string[][] | null {
+  if (graph.edges.length === 0) return [];
+  if (!isConnected(graph)) return null;
+
+  const odd = oddNodes(graph);
+  if (odd.length % 2 !== 0) return null; // 악수 정리상 있을 수 없다
+  if (odd.length <= 2) {
+    const single = solve(graph);
+    return single ? [single] : null;
+  }
+
+  // odd[0]과 odd[마지막]은 전체 경로의 양 끝으로 남기고, 가운데를 짝지어 잇는다.
+  const bridges: StageEdge[] = [];
+  for (let i = 1; i + 1 < odd.length; i += 2) {
+    bridges.push({ id: `__bridge${i}`, from: odd[i], to: odd[i + 1] });
+  }
+  const augmented: GraphLike = { nodes: graph.nodes, edges: [...graph.edges, ...bridges] };
+  const path = solve(augmented, odd[0]);
+  if (!path) return null;
+
+  const bridgeIds = new Set(bridges.map((b) => b.id));
+  const strokes: string[][] = [];
+  let current: string[] = [];
+  for (const edgeId of path) {
+    if (bridgeIds.has(edgeId)) {
+      strokes.push(current);
+      current = [];
+    } else {
+      current.push(edgeId);
+    }
+  }
+  strokes.push(current);
+
+  const covered = strokes.flat();
+  if (covered.length !== graph.edges.length) return null;
+  if (new Set(covered).size !== graph.edges.length) return null;
+  if (strokes.some((stroke) => stroke.length === 0)) return null;
+  return strokes;
+}
+
 /** 모든 간선을 덮는 데 필요한 최소 붓 횟수 (PRD 8.3: max(1, 홀수점 ÷ 2)). */
 export function minStrokes(graph: GraphLike): number {
   return Math.max(1, oddNodes(graph).length / 2);
@@ -241,7 +290,9 @@ export function validateStage(stage: Stage): StageValidation {
   const status = eulerStatus(stage);
   const odd = oddNodes(stage);
 
-  if (stage.type === 'DRAW') {
+  const maxStrokes = stage.maxStrokes ?? 1;
+
+  if (stage.type === 'DRAW' && maxStrokes === 1) {
     if (status === 'impossible') {
       problems.push(`DRAW 스테이지인데 한붓그리기가 불가능합니다 (홀수점 ${odd.length}개).`);
     } else {
@@ -258,6 +309,23 @@ export function validateStage(stage: Stage): StageValidation {
       problems.push(`tier 1은 홀수점 0개여야 하는데 ${odd.length}개입니다.`);
     if (stage.tier === 2 && status !== 'path')
       problems.push(`tier 2는 홀수점 2개여야 하는데 ${odd.length}개입니다.`);
+  }
+
+  // 두붓 이상 — 선언한 붓 수가 실제 최소 붓 수와 정확히 같아야 한다.
+  // 더 적게 필요하면 문제가 시시해지고, 더 필요하면 아예 못 푼다.
+  if (stage.type === 'DRAW' && maxStrokes > 1) {
+    const needed = minStrokes(stage);
+    if (needed !== maxStrokes) {
+      problems.push(
+        `maxStrokes=${maxStrokes}인데 실제로 필요한 붓 수는 ${needed}입니다 (홀수점 ${odd.length}개).`,
+      );
+    }
+    const strokes = solveInStrokes(stage);
+    if (!strokes) {
+      problems.push(`${maxStrokes}획으로 덮는 실제 해를 찾지 못했습니다.`);
+    } else if (strokes.length !== maxStrokes) {
+      problems.push(`해가 ${strokes.length}획으로 나왔습니다 (선언은 ${maxStrokes}획).`);
+    }
   }
 
   if (stage.type === 'JUDGE') {

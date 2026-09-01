@@ -25,6 +25,10 @@ export interface GameEngine {
   hintNodes: string[];
   /** 시작 전 안내용 — 이 스테이지에서 출발할 수 있는 점들. */
   startCandidates: string[];
+  /** 지금 몇 번째 붓인지 (1부터). */
+  strokeIndex: number;
+  /** 이 스테이지에서 쓸 수 있는 붓 수. 1이면 한붓그리기. */
+  maxStrokes: number;
   beginTimer: () => void;
   selectNode: (nodeId: string) => MoveResult;
   /** 붓을 뗐음을 알린다. 선을 그리던 중이었다면 실패로 판정한다. */
@@ -52,12 +56,17 @@ export function useGameEngine(stage: Stage): GameEngine {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   /** 선을 그리던 중 붓을 떼서 실패한 상태. 다시하기로만 벗어난다. */
   const [strokeBroken, setStrokeBroken] = useState(false);
+  /** 지금 몇 번째 붓인지 (1부터). */
+  const [strokeIndex, setStrokeIndex] = useState(1);
+  /** 이번 붓을 시작할 때의 usedEdges 길이. 이번 붓으로 실제로 그은 게 있는지 판단한다. */
+  const [strokeStartAt, setStrokeStartAt] = useState(0);
   /** 방문 노드 이력. undo에서 이전 노드로 정확히 되돌리기 위해 따로 쌓는다. */
   const nodeHistory = useRef<string[]>([]);
 
   const adj = useMemo(() => adjacency(stage), [stage]);
   const usedEdgeSet = useMemo(() => new Set(usedEdges), [usedEdges]);
   const totalEdges = stage.edges.length;
+  const maxStrokes = Math.max(1, stage.maxStrokes ?? 1);
   const remainingEdges = totalEdges - usedEdges.length;
   const startCandidates = useMemo(() => validStartNodes(stage), [stage]);
 
@@ -95,6 +104,10 @@ export function useGameEngine(stage: Stage): GameEngine {
       if (strokeBroken) return 'rejected';
       setHintNodes([]);
       if (currentNode === null) {
+        // 아직 지날 선이 남아 있는 점에서만 시작할 수 있다.
+        // 두 번째 붓에서 이미 다 쓴 점을 골라 갇히는 일을 막는다.
+        const open = (adj.get(nodeId) ?? []).some((i) => !usedEdgeSet.has(i.edgeId));
+        if (!open) return 'rejected';
         nodeHistory.current = [nodeId];
         setCurrentNode(nodeId);
         return 'start';
@@ -117,22 +130,35 @@ export function useGameEngine(stage: Stage): GameEngine {
   );
 
   /**
-   * 붓을 뗐다. 한붓그리기는 한 번에 이어 그려야 하므로 실패로 판정한다.
-   * 다만 아직 선을 하나도 긋지 않았다면(시작점만 눌렀다 뗀 경우) 잘못 누른 것으로 보고
-   * 조용히 시작 전 상태로 되돌린다 — 실패로 치지 않는다.
+   * 붓을 뗐다.
+   * - 이번 붓으로 아직 아무 선도 긋지 않았다면(시작점만 눌렀다 뗌) 조용히 시작 전으로.
+   *   잘못 누른 것까지 벌하지는 않는다.
+   * - 아직 쓸 붓이 남았으면(두붓 스테이지의 첫 붓) 다음 붓으로 넘어간다.
+   *   이때 currentNode를 비워 아무 점에서나 다시 시작할 수 있게 한다 — 두붓의 핵심이다.
+   * - 마지막 붓이었다면 실패로 판정한다.
    */
   const breakStroke = useCallback(() => {
     if (strokeBroken) return;
     if (currentNode === null) return;
     if (usedEdges.length === totalEdges && totalEdges > 0) return; // 이미 클리어
-    if (usedEdges.length === 0) {
+
+    // 이번 붓으로 그은 선이 없다 → 붓을 쓴 것으로 치지 않는다.
+    if (usedEdges.length === strokeStartAt) {
       nodeHistory.current = [];
       setCurrentNode(null);
       return;
     }
+
     setHintNodes([]);
+    if (strokeIndex < maxStrokes) {
+      nodeHistory.current = [];
+      setCurrentNode(null);
+      setStrokeIndex((n) => n + 1);
+      setStrokeStartAt(usedEdges.length);
+      return;
+    }
     setStrokeBroken(true);
-  }, [currentNode, strokeBroken, totalEdges, usedEdges.length]);
+  }, [currentNode, maxStrokes, strokeBroken, strokeIndex, strokeStartAt, totalEdges, usedEdges.length]);
 
   /** 마지막 한 선을 취소한다. 시작점만 고른 상태면 시작점 선택도 되돌린다. */
   const undo = useCallback(() => {
@@ -158,6 +184,8 @@ export function useGameEngine(stage: Stage): GameEngine {
     setUsedEdges([]);
     setHintNodes([]);
     setStrokeBroken(false);
+    setStrokeIndex(1);
+    setStrokeStartAt(0);
     setResetCount((c) => c + 1);
   }, []);
 
@@ -192,6 +220,8 @@ export function useGameEngine(stage: Stage): GameEngine {
     elapsedMs,
     hintNodes,
     startCandidates,
+    strokeIndex,
+    maxStrokes,
     beginTimer,
     selectNode,
     breakStroke,

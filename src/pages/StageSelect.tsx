@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { BONUS_STAGES, MAIN_STAGES } from '../data/stages';
+import {
+  BONUS_STAGES,
+  MAIN_STAGES,
+  MULTI_STROKE_STAGES,
+  PATH_CHALLENGE_STAGES,
+} from '../data/stages';
 import { StageCard } from '../components/StageCard';
 import { ConceptCard } from '../components/ConceptCard';
 import { useSession } from '../state/sessionStore';
@@ -92,6 +97,42 @@ export function StageSelect() {
         <p className="text-xs text-slate-500">S12를 깨면 열립니다</p>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {BONUS_STAGES.map((stage, index) => (
+            <StageCard
+              key={stage.id}
+              stage={stage}
+              index={index}
+              unlocked={isUnlocked(stage.id)}
+              record={profile?.best[stage.id]}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-bold text-orange-800">도전 경로 · 시작점을 찾아라</h2>
+        <p className="text-xs text-slate-500">
+          점이 많아도 홀수점은 딱 둘. 그 둘 중 하나에서 출발해야만 풀립니다.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {PATH_CHALLENGE_STAGES.map((stage, index) => (
+            <StageCard
+              key={stage.id}
+              stage={stage}
+              index={index}
+              unlocked={isUnlocked(stage.id)}
+              record={profile?.best[stage.id]}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-bold text-violet-800">두붓 그리기</h2>
+        <p className="text-xs text-slate-500">
+          홀수점이 4개라 한 붓으로는 안 되는 도형들. 붓을 한 번 떼서 두 획으로 그립니다.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {MULTI_STROKE_STAGES.map((stage, index) => (
             <StageCard
               key={stage.id}
               stage={stage}

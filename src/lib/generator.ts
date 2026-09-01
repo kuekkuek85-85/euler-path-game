@@ -141,3 +141,41 @@ function fallbackStage(template: Stage): Stage {
   const edges: StageEdge[] = pairs.map(([from, to], i) => ({ id: `g${i + 1}`, from, to }));
   return { ...template, nodes, edges, tier: 3, type: 'DRAW', parTimeSec: 72 };
 }
+
+/**
+ * 경로형 도전 도형 — 홀수점이 정확히 2개라 **시작점을 골라야** 풀리는 도형.
+ *
+ * 만드는 법: 먼저 모든 차수가 짝수인 회로를 (목표-1)개 간선으로 만든 뒤,
+ * 아직 이어져 있지 않은 두 점을 선 하나로 잇는다. 그 두 점만 홀수가 되므로
+ * 홀수점이 정확히 2개인 오일러 "경로" 도형이 된다.
+ */
+export function generatePathStage(
+  template: Stage,
+  rng: () => number = Math.random,
+  targetEdges = MIN_EDGES + 1,
+): Stage | null {
+  const base = generateCircuitStage(template, rng, targetEdges - 1);
+  if (base.edges.length !== targetEdges - 1) return null;
+
+  const ids = base.nodes.map((n) => n.id);
+  const linked = new Set(base.edges.map((e) => edgeKey(e.from, e.to)));
+
+  // 아직 이어지지 않은 쌍 중 하나를 고른다. 너무 가까운 이웃보다 건너편이 보기 좋다.
+  const candidates: [string, string][] = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    for (let j = i + 1; j < ids.length; j += 1) {
+      if (!linked.has(edgeKey(ids[i], ids[j]))) candidates.push([ids[i], ids[j]]);
+    }
+  }
+  if (candidates.length === 0) return null;
+  const [from, to] = candidates[Math.floor(rng() * candidates.length)];
+
+  const stage: Stage = {
+    ...base,
+    edges: [...base.edges, { id: `g${base.edges.length + 1}`, from, to }],
+  };
+  if (!isConnected(stage)) return null;
+  if (eulerStatus(stage) !== 'path') return null;
+  if (!solve(stage)) return null;
+  return stage;
+}

@@ -12,7 +12,18 @@ export const STAGE_BY_ID: Record<string, Stage> = Object.fromEntries(
 export const STATIC_STAGES = STAGES;
 
 export const MAIN_STAGES = STAGES.filter((stage) => !stage.bonus);
-export const BONUS_STAGES = STAGES.filter((stage) => stage.bonus);
+const isSingleStroke = (stage: Stage) => (stage.maxStrokes ?? 1) === 1;
+
+/** 보너스 중 한붓 회로형 (판별 미션 + 도전 회로 B01~B06). */
+export const BONUS_STAGES = STAGES.filter(
+  (stage) => stage.bonus && isSingleStroke(stage) && stage.tier !== 2,
+);
+/** 홀수점 2개 — 시작점을 찾아야 하는 도전 경로 (D01~D03). */
+export const PATH_CHALLENGE_STAGES = STAGES.filter(
+  (stage) => stage.bonus && isSingleStroke(stage) && stage.tier === 2,
+);
+/** 두붓 이상이 필요한 응용 스테이지 (C01~C04). */
+export const MULTI_STROKE_STAGES = STAGES.filter((stage) => (stage.maxStrokes ?? 1) > 1);
 
 export function getStage(id: string): Stage | undefined {
   return STAGE_BY_ID[id];

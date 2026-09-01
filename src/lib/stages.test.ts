@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { BONUS_STAGES, MAIN_STAGES, STAGES, STATIC_STAGES } from '../data/stages';
-import { eulerStatus, minStrokes, oddNodes, solve, validStartNodes, validateStage } from './graph';
+import {
+  BONUS_STAGES,
+  MAIN_STAGES,
+  MULTI_STROKE_STAGES,
+  PATH_CHALLENGE_STAGES,
+  STAGES,
+  STATIC_STAGES,
+} from '../data/stages';
+import {
+  eulerStatus,
+  minStrokes,
+  oddNodes,
+  solve,
+  solveInStrokes,
+  validStartNodes,
+  validateStage,
+} from './graph';
 import { generateCircuitStage, makeRng } from './generator';
 
 describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
@@ -23,10 +38,31 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     }
   });
 
-  it('본편 12스테이지 + 보너스 6스테이지로 구성된다', () => {
+  it('본편 12 + 보너스 6 + 도전 경로 3 + 두붓 4로 구성된다', () => {
     expect(MAIN_STAGES).toHaveLength(12);
-    // B01 판별 미션 + 고정 도전 회로 5종(B02~B06)
-    expect(BONUS_STAGES).toHaveLength(6);
+    expect(BONUS_STAGES.map((s) => s.id)).toEqual(['B01', 'B02', 'B03', 'B04', 'B05', 'B06']);
+    expect(PATH_CHALLENGE_STAGES.map((s) => s.id)).toEqual(['D01', 'D02', 'D03']);
+    expect(MULTI_STROKE_STAGES.map((s) => s.id)).toEqual(['C01', 'C02', 'C03', 'C04']);
+  });
+
+  it('도전 경로 3종은 홀수점이 정확히 2개다 — 시작점을 골라야 한다', () => {
+    for (const stage of PATH_CHALLENGE_STAGES) {
+      expect(oddNodes(stage)).toHaveLength(2);
+      expect(eulerStatus(stage)).toBe('path');
+      // 두 홀수점에서만 풀리고, 나머지 점에서는 반드시 막힌다
+      const starts = validStartNodes(stage);
+      expect(starts).toHaveLength(2);
+      for (const node of stage.nodes) {
+        const path = solve(stage, node.id);
+        if (starts.includes(node.id)) expect(path).toHaveLength(stage.edges.length);
+        else expect(path).toBeNull();
+      }
+    }
+  });
+
+  it('도전 경로는 간선 수가 뒤로 갈수록 늘어난다', () => {
+    const counts = PATH_CHALLENGE_STAGES.map((s) => s.edges.length);
+    expect(counts).toEqual([13, 15, 17]);
   });
 
   it('도전 회로 5종은 모두 짝수점뿐인 오일러 회로다', () => {
@@ -56,7 +92,11 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     },
   );
 
-  it.each(STATIC_STAGES.filter((s) => s.type === 'DRAW').map((s) => [s.id, s] as const))(
+  it.each(
+    STATIC_STAGES.filter((s) => s.type === 'DRAW' && (s.maxStrokes ?? 1) === 1).map(
+      (s) => [s.id, s] as const,
+    ),
+  )(
     '%s — 허용된 모든 시작점에서 실제 해가 나온다',
     (_id, stage) => {
       const starts = validStartNodes(stage);
@@ -108,6 +148,40 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     expect(stage.edges).toHaveLength(16);
     expect(eulerStatus(stage)).toBe('impossible');
     expect(minStrokes(stage)).toBe(2);
+  });
+
+  it.each(
+    STATIC_STAGES.filter((s) => (s.maxStrokes ?? 1) > 1).map((s) => [s.id, s] as const),
+  )('%s — 선언한 붓 수로 실제 해가 나오고, 한 붓으로는 불가능하다', (_id, stage) => {
+    const strokes = solveInStrokes(stage);
+    expect(strokes).not.toBeNull();
+    expect(strokes).toHaveLength(stage.maxStrokes!);
+    // 모든 간선을 정확히 한 번씩 덮는다
+    const covered = strokes!.flat();
+    expect(covered).toHaveLength(stage.edges.length);
+    expect(new Set(covered).size).toBe(stage.edges.length);
+    // 한 붓으로는 못 그린다 — 그럴 수 있으면 두붓 스테이지일 이유가 없다
+    expect(minStrokes(stage)).toBe(stage.maxStrokes);
+    expect(solve(stage)).toBeNull();
+    expect(oddNodes(stage)).toHaveLength(2 * stage.maxStrokes!);
+  });
+
+  it('두붓 스테이지 4개가 있다', () => {
+    const two = STAGES.filter((s) => (s.maxStrokes ?? 1) === 2);
+    expect(two.map((s) => s.id)).toEqual(['C01', 'C02', 'C03', 'C04']);
+  });
+
+  it('C03·C04는 S11·B01과 같은 도형이다 — 판정한 것을 실제로 그려 본다', () => {
+    const pairs: [string, string][] = [
+      ['C03', 'S11'],
+      ['C04', 'B01'],
+    ];
+    for (const [draw, judge] of pairs) {
+      const d = STAGES.find((s) => s.id === draw)!;
+      const j = STAGES.find((s) => s.id === judge)!;
+      expect(d.edges.map((e) => e.id)).toEqual(j.edges.map((e) => e.id));
+      expect(d.maxStrokes).toBe(j.answer!.minStrokes);
+    }
   });
 
   it('tier 1은 전부 회로, tier 2는 전부 경로다', () => {

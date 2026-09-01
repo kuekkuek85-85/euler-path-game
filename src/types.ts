@@ -45,6 +45,12 @@ export interface Stage {
   unlockedBy?: string | null;
   /** true면 스테이지 선택 화면의 보너스 구역에 배치한다. */
   bonus?: boolean;
+  /**
+   * 허용되는 붓(획) 수. 없으면 1 — 한붓그리기.
+   * 2면 두붓그리기: 한 번 붓을 뗀 뒤 아무 점에서나 다시 시작할 수 있다.
+   * 홀수점이 2×maxStrokes개인 도형이어야 하고, 유닛테스트가 이를 검사한다.
+   */
+  maxStrokes?: number;
   decor?: StageDecor;
   /** JUDGE 타입 전용. */
   answer?: JudgeAnswer;

@@ -107,6 +107,16 @@ function DrawBoard({ stage }: { stage: Stage }) {
     navigator.vibrate?.([15, 40, 15]);
   }, [engine.status]);
 
+  // 두붓 스테이지에서 다음 붓으로 넘어갔을 때
+  useEffect(() => {
+    if (engine.strokeIndex <= 1) return;
+    navigator.vibrate?.(20);
+    setToast({
+      message: `${engine.strokeIndex}번째 붓이에요. 남은 선이 있는 아무 점에서나 시작하세요.`,
+      tone: 'info',
+    });
+  }, [engine.strokeIndex]);
+
   // 클리어 → 결과 화면
   useEffect(() => {
     if (engine.status !== 'cleared' || submitted.current) return;
@@ -178,6 +188,19 @@ function DrawBoard({ stage }: { stage: Stage }) {
               {engine.remainingEdges} / {engine.totalEdges}
             </b>
           </span>
+          {engine.maxStrokes > 1 && (
+            <>
+              <span aria-hidden="true" className="text-slate-300">
+                |
+              </span>
+              <span>
+                붓{' '}
+                <b className="text-violet-700">
+                  {engine.strokeIndex} / {engine.maxStrokes}
+                </b>
+              </span>
+            </>
+          )}
           <span aria-hidden="true" className="text-slate-300">
             |
           </span>
@@ -220,9 +243,21 @@ function DrawBoard({ stage }: { stage: Stage }) {
               <p className="animate-pop-in text-4xl" aria-hidden="true">
                 ✏️
               </p>
-              <p className="text-lg font-bold text-slate-900">붓을 뗐어요</p>
+              <p className="text-lg font-bold text-slate-900">
+                {engine.maxStrokes > 1 ? '붓을 다 썼어요' : '붓을 뗐어요'}
+              </p>
               <p className="text-sm leading-relaxed text-slate-600">
-                한붓그리기는 시작부터 끝까지 <b>한 번에 이어서</b> 그려야 해요.
+                {engine.maxStrokes > 1 ? (
+                  <>
+                    이 도형은 <b>{engine.maxStrokes}붓</b>까지만 쓸 수 있어요.
+                    <br />
+                    어디서 끊을지가 중요해요.
+                  </>
+                ) : (
+                  <>
+                    한붓그리기는 시작부터 끝까지 <b>한 번에 이어서</b> 그려야 해요.
+                  </>
+                )}
                 <br />
                 선 {engine.totalEdges - engine.remainingEdges}개까지 잘 갔어요. 다시 해볼까요?
               </p>
@@ -239,8 +274,22 @@ function DrawBoard({ stage }: { stage: Stage }) {
 
         {engine.currentNode === null && !counting && (
           <p className="mt-2 text-center text-sm text-slate-600 landscape:text-xs">
-            시작할 점을 누른 채 이어진 점으로 끌어 보세요.
-            <b className="text-slate-800"> 도중에 손을 떼면 처음부터 다시</b> 그려야 해요.
+            {engine.strokeIndex > 1 ? (
+              <>
+                <b className="text-violet-700">두 번째 붓</b>이에요. 남은 선이 있는{' '}
+                <b className="text-slate-800">아무 점에서나</b> 다시 시작할 수 있어요.
+              </>
+            ) : engine.maxStrokes > 1 ? (
+              <>
+                이 도형은 <b className="text-violet-700">두 붓</b>으로 그립니다. 한 번은 떼도
+                되지만, <b className="text-slate-800">두 번 떼면 처음부터</b>예요.
+              </>
+            ) : (
+              <>
+                시작할 점을 누른 채 이어진 점으로 끌어 보세요.
+                <b className="text-slate-800"> 도중에 손을 떼면 처음부터 다시</b> 그려야 해요.
+              </>
+            )}
           </p>
         )}
       </div>

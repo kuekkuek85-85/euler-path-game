@@ -32,15 +32,14 @@ Firebase 설정 없이도 **12스테이지 전부 플레이된다**(기록은 �
 
 ## 1. Firebase 설정
 
-프로젝트 ID는 `euler-path-game`이다. 2026-09-01 기준 남은 작업은 **2·5번** 두 가지다.
+프로젝트 ID는 `euler-path-game`이다. 2026-09-01 기준 남은 작업은 **5번 하나**다.
 
 1. ~~[Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만든다.~~ (완료)
-2. **Authentication → 시작하기 → Sign-in method → 익명(Anonymous) 사용 설정.**
-   현재 이 프로젝트는 Authentication이 아직 활성화되지 않아
-   (`CONFIGURATION_NOT_FOUND`) 로그인이 실패한다. **이걸 켜야 기록이 저장된다.**
+2. ~~**Authentication → Sign-in method → 익명(Anonymous) 사용 설정.**~~
+   (완료 — `accounts:signUp`이 정상적으로 idToken을 반환한다)
 3. ~~**Firestore Database**를 만든다.~~ (완료 — 응답이 404가 아니라 403이므로 DB는 존재한다)
 4. ~~**프로젝트 설정 → 내 앱 → 웹 앱 추가.**~~ (완료)
-5. **보안 규칙과 색인을 배포한다** (아래 참고). 지금은 기본 규칙이 모든 접근을 막고 있다.
+5. **보안 규칙을 배포한다** (아래 참고). 지금은 기본 규칙이 모든 접근을 막고 있다.
 6. 저장소 루트에 `.env`를 만들고 `.env.example`을 채운다.
 
 > 설정이 끝났는지 확인하려면 `/teacher` → **연결 상태 점검**을 누른다.
@@ -51,7 +50,13 @@ cp .env.example .env
 # VITE_FIREBASE_* 값과 VITE_TEACHER_PIN(6자리)을 채운다
 ```
 
-### 보안 규칙과 인덱스 배포
+### 보안 규칙 배포
+
+가장 간단한 방법은 콘솔에 붙여넣는 것이다 — CLI 설치가 필요 없다.
+
+**Firebase 콘솔 → Firestore Database → 규칙 탭 → 전체를 `firestore.rules` 내용으로 교체 → 게시**
+
+CLI를 쓴다면:
 
 ```bash
 npm install -g firebase-tools
@@ -59,12 +64,19 @@ firebase login
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-`firestore.rules`와 `firestore.indexes.json`이 저장소에 들어 있다.
 규칙 파일 상단 주석에 **알려진 한계**와 더 단단히 잠그는 방법이 적혀 있으니 배포 전에 읽을 것.
 
-### 교사 설정 문서 만들기
+### 색인
 
-`config/global` 문서를 콘솔에서 한 번 만들어 두면 교사 모드가 바로 동작한다.
+미리 만들 필요 없다. 대시보드 탭을 처음 열면 콘솔이 "이 색인을 만드세요" 링크를 띄우므로
+클릭하면 된다. 미리 만들고 싶다면 `firestore.indexes.json`에 필요한 4개가 들어 있다.
+
+### 컬렉션은 손으로 만들지 않아도 된다
+
+- `students`, `plays` — 학생이 처음 플레이할 때 자동으로 생긴다.
+- `config/global` — 규칙을 배포한 뒤 `/teacher`를 한 번 열면 앱이 기본값으로 만든다.
+
+만들어지는 기본값은 다음과 같고, `activeStages`가 빈 배열이면 "전부 활성"으로 해석한다.
 
 ```json
 {
@@ -74,8 +86,6 @@ firebase deploy --only firestore:rules,firestore:indexes
   "oddViewUnlocked": false
 }
 ```
-
-`activeStages`가 빈 배열이면 "전부 활성"으로 해석한다.
 
 ---
 

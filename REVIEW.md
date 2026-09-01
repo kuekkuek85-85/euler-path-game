@@ -195,7 +195,7 @@ PRD 1.2 각주대로 2학기 정보과 교수학습 및 평가 운영 계획과 
 - [x] Firebase 프로젝트 생성 (완료) / Firestore DB 생성 (완료)
 - [ ] **Authentication → 익명 로그인 활성화** ← 지금 막혀 있는 지점 (4.2)
 - [ ] **`firebase deploy --only firestore:rules,firestore:indexes`** ← 지금 막혀 있는 지점 (4.2)
-- [ ] `config/global` 문서 초기값 생성
+- [x] `config/global` 문서 초기값 생성 — 교사 모드가 자동 생성하도록 변경(수동 작업 불필요)
 - [x] `plays.timeMs > 1000` 유지 결정 (2026-09-01)
 - [ ] 3.1의 `config/global` 쓰기 권한 방향 결정 (조건부 쓰기 유지 vs `config/admins` 허용 목록) — **미결**
 - [ ] Vercel 환경변수 등록 (`VITE_TEACHER_PIN` 포함)

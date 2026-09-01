@@ -134,7 +134,8 @@ export async function runConnectionCheck(): Promise<CheckResult[]> {
         name: '교사 설정 읽기',
         status: 'fail',
         detail: 'config/global 문서가 아직 없습니다.',
-        action: 'Firebase 콘솔에서 만들거나, 아래 설정을 한 번 바꾸면 자동으로 생성됩니다.',
+        action:
+          '이 화면을 새로고침하면 앱이 기본값으로 만듭니다. 콘솔에서 직접 만들 필요는 없습니다.',
       });
     }
   } catch (error) {

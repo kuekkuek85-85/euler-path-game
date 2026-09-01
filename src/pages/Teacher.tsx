@@ -4,6 +4,7 @@ import type { GlobalConfig, StudentProfile } from '../types';
 import { STAGES } from '../data/stages';
 import {
   deleteStudent,
+  ensureConfigDoc,
   listAllStudents,
   readLocalConfig,
   saveConfig,
@@ -110,6 +111,22 @@ function TeacherConsole() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => subscribeConfig(setConfig), []);
+
+  // 설정 문서가 없으면 여기서 만든다. 선생님이 콘솔에서 손으로 만들 필요가 없다.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const outcome = await ensureConfigDoc();
+      if (cancelled) return;
+      if (outcome.status === 'created') setStatus('교사 설정 문서를 새로 만들었습니다.');
+      else if (outcome.status === 'failed' && outcome.error) {
+        setStatus(`교사 설정 문서를 만들지 못했습니다: ${outcome.error}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const update = async (patch: Partial<GlobalConfig>) => {
     const next = { ...config, ...patch };

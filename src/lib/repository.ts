@@ -556,6 +556,36 @@ export function subscribeConfig(onData: (config: GlobalConfig) => void): Unsubsc
   });
 }
 
+/**
+ * config/global 문서가 없으면 기본값으로 만든다.
+ * 선생님이 콘솔에서 문서를 손으로 만들 필요가 없도록, 교사 모드가 열릴 때 한 번 호출한다.
+ * (students·plays는 첫 저장 때 자동으로 생기므로 따로 만들 것이 없다.)
+ */
+export async function ensureConfigDoc(): Promise<{
+  status: 'created' | 'exists' | 'failed';
+  error?: string;
+}> {
+  const db = await getDb();
+  if (!db) return { status: 'failed', error: 'Firebase가 설정되지 않았습니다.' };
+  try {
+    const { doc, getDoc, serverTimestamp, setDoc } = await firestoreApi();
+    const ref = doc(db, 'config', 'global');
+    const snapshot = await getDoc(ref);
+    if (snapshot.exists()) return { status: 'exists' };
+    // 보안 규칙이 허용하는 필드만 정확히 담는다.
+    await setDoc(ref, {
+      dashboardVisible: DEFAULT_CONFIG.dashboardVisible,
+      nameMasking: DEFAULT_CONFIG.nameMasking,
+      activeStages: DEFAULT_CONFIG.activeStages,
+      oddViewUnlocked: DEFAULT_CONFIG.oddViewUnlocked,
+      updatedAt: serverTimestamp(),
+    });
+    return { status: 'created' };
+  } catch (error) {
+    return { status: 'failed', error: String(error) };
+  }
+}
+
 export async function saveConfig(config: GlobalConfig): Promise<{ ok: boolean; error?: string }> {
   writeJson(STORAGE_KEYS.localConfig, config);
   const db = await getDb();

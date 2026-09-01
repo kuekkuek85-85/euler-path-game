@@ -9,6 +9,7 @@ import {
   saveConfig,
   subscribeConfig,
 } from '../lib/repository';
+import { type CheckResult, runConnectionCheck } from '../lib/diagnostics';
 import { classIdOf, displayName, toCsv } from '../lib/format';
 import { STORAGE_KEYS, readJson, writeJson } from '../lib/storage';
 import { ClassTab, RankingTab } from '../components/Dashboard/DashboardTabs';
@@ -240,6 +241,8 @@ function TeacherConsole() {
         📺 프레젠테이션 뷰 열기
       </button>
 
+      <ConnectionCheck />
+
       <section className="mt-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <h2 className="text-base font-bold text-slate-900">수업 설정</h2>
         <div className="mt-3 space-y-2">
@@ -351,6 +354,65 @@ function TeacherConsole() {
         </p>
       )}
     </main>
+  );
+}
+
+/**
+ * 연결 상태 점검 — "기록이 저장되지 않아요"의 원인이
+ * 설정 누락인지 네트워크인지 한 번에 가른다.
+ */
+function ConnectionCheck() {
+  const [results, setResults] = useState<CheckResult[] | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const run = async () => {
+    setRunning(true);
+    try {
+      setResults(await runConnectionCheck());
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const icon: Record<CheckResult['status'], string> = { ok: '✅', fail: '❌', skip: '⏭️' };
+
+  return (
+    <section className="mt-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">연결 상태 점검</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            기록이 저장되지 않을 때 원인을 알려 줍니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={running}
+          className="shrink-0 rounded-2xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50"
+        >
+          {running ? '확인 중…' : '점검하기'}
+        </button>
+      </div>
+
+      {results && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={result.name} className="rounded-2xl bg-slate-50 px-3 py-2.5">
+              <p className="text-sm font-semibold text-slate-900">
+                <span aria-hidden="true">{icon[result.status]}</span> {result.name}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-600">{result.detail}</p>
+              {result.action && (
+                <p className="mt-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900">
+                  → {result.action}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

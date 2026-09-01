@@ -32,11 +32,19 @@ Firebase 설정 없이도 **12스테이지 전부 플레이된다**(기록은 �
 
 ## 1. Firebase 설정
 
-1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만든다.
-2. **Authentication → 로그인 방법 → 익명**을 켠다.
-3. **Firestore Database**를 만든다 (프로덕션 모드, 리전은 `asia-northeast3` 서울 권장).
-4. **프로젝트 설정 → 내 앱 → 웹 앱 추가** 후 SDK 설정값을 복사한다.
-5. 저장소 루트에 `.env`를 만들고 `.env.example`을 채운다.
+프로젝트 ID는 `euler-path-game`이다. 2026-09-01 기준 남은 작업은 **2·5번** 두 가지다.
+
+1. ~~[Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만든다.~~ (완료)
+2. **Authentication → 시작하기 → Sign-in method → 익명(Anonymous) 사용 설정.**
+   현재 이 프로젝트는 Authentication이 아직 활성화되지 않아
+   (`CONFIGURATION_NOT_FOUND`) 로그인이 실패한다. **이걸 켜야 기록이 저장된다.**
+3. ~~**Firestore Database**를 만든다.~~ (완료 — 응답이 404가 아니라 403이므로 DB는 존재한다)
+4. ~~**프로젝트 설정 → 내 앱 → 웹 앱 추가.**~~ (완료)
+5. **보안 규칙과 색인을 배포한다** (아래 참고). 지금은 기본 규칙이 모든 접근을 막고 있다.
+6. 저장소 루트에 `.env`를 만들고 `.env.example`을 채운다.
+
+> 설정이 끝났는지 확인하려면 `/teacher` → **연결 상태 점검**을 누른다.
+> 익명 인증·설정 읽기·기록 읽기를 차례로 확인하고, 실패하면 콘솔에서 눌러야 할 항목을 알려 준다.
 
 ```bash
 cp .env.example .env
@@ -96,6 +104,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 | 기능 | 설명 |
 |---|---|
 | 프레젠테이션 뷰 | 대형 화면용. 상위 10명 + 학급 진행률만 크게 |
+| 연결 상태 점검 | 기록이 저장되지 않을 때 원인(설정 누락 / 규칙 / 네트워크)을 짚어 준다 |
 | 대시보드 공개 | 끄면 학생 화면에서 대시보드 메뉴가 사라진다 |
 | 이름 마스킹 | `김민수` → `김O수` (기본 켜짐) |
 | 홀수점 보기 조기 해금 | 1·2단계에서도 홀수점 토글을 열어 준다. **수업 흐름상 "정리 1"에서 켠다** |

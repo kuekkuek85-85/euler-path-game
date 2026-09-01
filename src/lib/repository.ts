@@ -4,7 +4,9 @@ import { STORAGE_KEYS, readJson, removeKey, writeJson } from './storage';
 
 export const DEFAULT_CONFIG: GlobalConfig = {
   dashboardVisible: true,
-  nameMasking: true,
+  // PRD 5.4는 기본 ON이었으나 2026-09-01 작성자 결정으로 OFF로 바꿨다.
+  // 교사 모드에서 언제든 다시 켤 수 있다.
+  nameMasking: false,
   activeStages: [],
   oddViewUnlocked: false,
 };
@@ -529,7 +531,8 @@ export function readLocalConfig(): GlobalConfig {
 function normalizeConfig(data: Record<string, unknown>): GlobalConfig {
   return {
     dashboardVisible: data.dashboardVisible !== false,
-    nameMasking: data.nameMasking !== false,
+    // 필드가 없으면 마스킹하지 않는다(기본값 OFF와 일치).
+    nameMasking: data.nameMasking === true,
     activeStages: Array.isArray(data.activeStages) ? (data.activeStages as string[]) : [],
     oddViewUnlocked: data.oddViewUnlocked === true,
     updatedAt: toMillis(data.updatedAt),

@@ -271,7 +271,7 @@ function TeacherConsole() {
           />
           <SettingToggle
             label="이름 마스킹"
-            description="김민수 → 김O수 로 표시합니다."
+            description="켜면 김민수 → 김O수 로 가려 표시합니다. 기본은 꺼짐(전체 이름 표시)."
             checked={config.nameMasking}
             onChange={(value) => void update({ nameMasking: value })}
           />

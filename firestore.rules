@@ -13,6 +13,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // 이름 길이 검사.
+    // rules의 string.size()가 문자 수인지 UTF-8 바이트 수인지에 따라 결과가 달라진다.
+    // "홍길동"은 문자로 3, 바이트로 9다. 한쪽만 가정하면 한글 이름이 통째로 거부될 수
+    // 있으므로, 양쪽 해석 모두에서 통과하는 범위(2~15)를 쓴다.
+    // 실제 "한글 2~5자" 검사는 클라이언트(lib/format.ts)가 정확히 수행한다.
+    function validName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 15;
+    }
+
     // ------------------------------------------------------------------
     // students/{studentNo} — 문서 ID가 학번이라 중복 계정이 생길 수 없다.
     // ------------------------------------------------------------------
@@ -22,26 +31,22 @@ service cloud.firestore {
       allow create: if signedIn()
         && studentNo.matches('^[0-9]{5}$')
         && request.resource.data.studentNo == studentNo
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 5
+        && validName(request.resource.data.name)
         && request.resource.data.totalScore == 0
         && request.resource.data.clearedCount == 0;
 
       allow update: if signedIn()
         && request.resource.data.studentNo == resource.data.studentNo
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2
-        && request.resource.data.name.size() <= 5
+        && validName(request.resource.data.name)
         // 점수는 감소할 수 없고, 1회 갱신 폭을 제한해 조작을 억제한다.
+        // 한 번의 갱신은 스테이지 하나의 최고 기록만 더하므로 2000이면 충분하다.
         && request.resource.data.totalScore >= resource.data.totalScore
         && request.resource.data.totalScore <= resource.data.totalScore + 2000
         && request.resource.data.clearedCount >= resource.data.clearedCount;
 
       // 오입력 학번 정리는 교사 모드에서 수행한다 (PRD 5.5).
       // PRD 6.4 초안은 delete: if false 였으나, 그러면 교사 모드의 "개별 기록 삭제"가
-      // 콘솔 작업이 되어 수업 중에 쓸 수 없다. 아래 teacherMode() 안내를 참고해
-      // 운영 정책에 맞는 쪽을 고른다.
+      // 콘솔 작업이 되어 수업 중에 쓸 수 없다.
       allow delete: if signedIn();
     }
 
@@ -56,10 +61,14 @@ service cloud.firestore {
         && request.resource.data.stageId is string
         && request.resource.data.cleared is bool
         && request.resource.data.timeMs is number
+        // PRD 6.4의 조작 억제 조건. 다만 S01(간선 3개)처럼 짧은 판은 1초 안에
+        // 끝날 수 있어 정상 기록이 거부될 수 있다. 그때는 클라이언트가 이 항목을
+        // 큐에서 버리고 총점 저장은 계속 진행한다(대시보드 최단 시간에서만 빠진다).
+        // 정상 기록을 하나도 잃고 싶지 않다면 아래를 timeMs > 0 으로 바꾼다.
         && request.resource.data.timeMs > 1000
         && request.resource.data.score is number
-        && request.resource.data.score <= 2000
-        && request.resource.data.score >= 0;
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 2000;
 
       allow update, delete: if false;
     }
@@ -71,10 +80,11 @@ service cloud.firestore {
     // 학생 화면에서 메뉴가 사라진다)을 앱 안에서 만족할 수 없어, 필드 형태를 엄격히
     // 검증하는 조건부 쓰기로 완화했다. 교사 모드 진입은 환경변수 PIN으로 막지만,
     // 이 규칙 자체는 "로그인한 누구나"를 허용한다는 점을 인지하고 운영할 것.
+    // 바꿀 수 있는 것은 대시보드 노출·마스킹·스테이지 잠금뿐이고 기록은 건드리지 못한다.
     //
-    // 더 단단히 잠그려면 아래 teacherMode()를 쓰고 config/admins 문서에
+    // 더 단단히 잠그려면 아래 teacherMode()를 쓰고, config/admins 문서에
     //   { uids: ["<교사 기기의 익명 uid>"] }
-    // 를 콘솔에서 한 번 넣어 준다. (교사 모드 화면에 uid가 표시된다)
+    // 를 콘솔에서 한 번 넣어 준다.
     //
     //   function teacherMode() {
     //     return signedIn()

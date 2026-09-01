@@ -226,7 +226,21 @@ export function recordPlay(log: PlayLog, profile: StudentProfile): void {
 
 let flushing = false;
 
-/** 큐에 쌓인 기록을 순서대로 전송한다. 실패하면 큐에 남겨 다음 기회를 노린다. */
+/**
+ * 다시 시도해 봐야 소용없는 실패인지 판단한다.
+ * 보안 규칙이 거부했거나(permission-denied) 값이 규칙 조건을 못 맞추면(invalid-argument)
+ * 몇 번을 보내도 같은 결과다. 이런 항목을 큐에 남겨 두면 뒤에 쌓인 정상 기록까지
+ * 영영 막히고 "저장 대기 중" 배지가 사라지지 않는다.
+ */
+function isPermanentFailure(error: unknown): boolean {
+  const code = /code=([a-z-]+)/.exec(String(error))?.[1] ?? '';
+  return code === 'permission-denied' || code === 'invalid-argument';
+}
+
+/**
+ * 큐에 쌓인 기록을 순서대로 전송한다.
+ * 일시적 실패는 큐에 남겨 다음 기회를 노리고, 영구 거부는 버려서 큐를 막지 않는다.
+ */
 export async function flushQueue(): Promise<void> {
   if (flushing || !firebaseEnabled) return;
   if (readPending().length === 0) return;
@@ -239,6 +253,8 @@ export async function flushQueue(): Promise<void> {
     let pending = readPending();
     while (pending.length > 0) {
       const item = pending[0];
+
+      // 1) 플레이 로그. 규칙에 걸려 거부돼도 학생의 점수 저장까지 막지는 않는다.
       try {
         await addDoc(collection(db, 'plays'), {
           studentNo: item.log.studentNo,
@@ -254,6 +270,18 @@ export async function flushQueue(): Promise<void> {
           path: item.log.path,
           createdAt: serverTimestamp(),
         });
+      } catch (error) {
+        if (!isPermanentFailure(error)) {
+          console.warn('[repository] 기록 전송 실패 — 큐에 남겨 둡니다.', error);
+          return;
+        }
+        // 예: 규칙의 timeMs > 1000 조건에 걸린 아주 빠른 클리어.
+        // 대시보드의 최단 시간 기록만 빠지고, 총점은 아래에서 계속 저장한다.
+        console.warn('[repository] 플레이 로그가 규칙에 거부되어 건너뜁니다.', error);
+      }
+
+      // 2) 학생 문서(총점·최고 기록). 이쪽이 진짜 중요한 저장이다.
+      try {
         await setDoc(
           doc(db, 'students', item.profile.studentNo),
           {
@@ -268,9 +296,13 @@ export async function flushQueue(): Promise<void> {
           { merge: true },
         );
       } catch (error) {
-        console.warn('[repository] 기록 전송 실패 — 큐에 남겨 둡니다.', error);
-        return;
+        if (!isPermanentFailure(error)) {
+          console.warn('[repository] 기록 전송 실패 — 큐에 남겨 둡니다.', error);
+          return;
+        }
+        console.warn('[repository] 학생 문서 저장이 규칙에 거부되어 건너뜁니다.', error);
       }
+
       pending = readPending().filter((p) => p.localId !== item.localId);
       writePending(pending);
     }

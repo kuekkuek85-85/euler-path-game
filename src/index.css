@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-paper: #f8fafc;
+  --color-line-idle: #cbd5e1;
+  --color-line-used: #2563eb;
+  --color-node: #475569;
+  --color-node-odd: #ea580c;
+  --color-node-even: #0d9488;
+  --color-accent: #2563eb;
+  --color-good: #16a34a;
+  --color-warn: #d97706;
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family:
+    'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic',
+    system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* PRD 7.1: 캔버스 위에서 스크롤·핀치 확대 차단 */
+.no-touch-scroll {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.18s ease-in-out 2;
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    r: 6;
+  }
+  50% {
+    opacity: 0.95;
+    r: 9;
+  }
+}
+
+.hint-pulse {
+  animation: hint-pulse 0.5s ease-in-out 2;
+}
+
+@keyframes edge-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 지나간 선이 진행 방향으로 채워지는 연출 (PRD 5.3) */
+.edge-draw {
+  stroke-dasharray: 1;
+  animation: edge-draw 0.22s ease-out both;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.22s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .hint-pulse,
+  .animate-pop-in,
+  .edge-draw {
+    animation: none;
+  }
+
+  .edge-draw {
+    stroke-dasharray: none;
+  }
+}

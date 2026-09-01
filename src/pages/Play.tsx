@@ -1,0 +1,316 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import type { Stage } from '../types';
+import { getStage } from '../data/stages';
+import { generateCircuitStage } from '../lib/generator';
+import { oddNodes } from '../lib/graph';
+import { scoreForStage } from '../lib/scoring';
+import { formatClock } from '../lib/format';
+import { HINT_LIMIT, useGameEngine } from '../hooks/useGameEngine';
+import { usePointerDraw } from '../hooks/usePointerDraw';
+import { GameCanvas } from '../components/GameCanvas';
+import { Countdown } from '../components/Countdown';
+import { ConceptCard } from '../components/ConceptCard';
+import { Toast, type ToastTone } from '../components/Toast';
+import { useSession } from '../state/sessionStore';
+import { JudgeBoard } from './JudgeBoard';
+
+export function Play() {
+  const { stageId = '' } = useParams();
+  const { identity, isUnlocked } = useSession();
+  const template = getStage(stageId);
+  // B02는 진입할 때마다 새 도형을 만든다.
+  const [instance, setInstance] = useState(0);
+  const stage = useMemo<Stage | undefined>(() => {
+    if (!template) return undefined;
+    if (!template.generated) return template;
+    void instance;
+    return generateCircuitStage(template);
+  }, [template, instance]);
+
+  if (!identity) return <Navigate to="/" replace />;
+  if (!template || !stage) return <Navigate to="/stages" replace />;
+  if (!isUnlocked(template.id)) return <Navigate to="/stages" replace />;
+
+  if (stage.type === 'JUDGE') return <JudgeBoard stage={stage} />;
+  return (
+    <DrawBoard
+      key={`${stage.id}-${instance}`}
+      stage={stage}
+      onRegenerate={template.generated ? () => setInstance((n) => n + 1) : undefined}
+    />
+  );
+}
+
+function DrawBoard({ stage, onRegenerate }: { stage: Stage; onRegenerate?: () => void }) {
+  const navigate = useNavigate();
+  const { submitResult, config } = useSession();
+  const engine = useGameEngine(stage);
+  const [counting, setCounting] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const [oddView, setOddView] = useState(false);
+  const [conceptOpen, setConceptOpen] = useState(false);
+  const [shake, setShake] = useState(false);
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const [stuckStreak, setStuckStreak] = useState(0);
+  const submitted = useRef(false);
+  const wasStuck = useRef(false);
+
+  // PRD 3.3: 홀수점 보기는 3단계부터 기본 해금, 그 전에는 교사 설정으로 연다.
+  const oddViewAllowed = stage.tier >= 3 || config.oddViewUnlocked;
+
+  const onNodeHit = useCallback(
+    (nodeId: string) => {
+      if (counting) return;
+      const result = engine.selectNode(nodeId);
+      if (result === 'rejected') {
+        // 오답이 아니라 무시. 짧은 흔들림과 진동으로만 알린다 (PRD 3.2).
+        setShake(true);
+        window.setTimeout(() => setShake(false), 380);
+        navigator.vibrate?.(20);
+      }
+    },
+    [counting, engine],
+  );
+
+  const draw = usePointerDraw(stage.nodes, onNodeHit, !counting && engine.status !== 'cleared');
+
+  // 경과 시간 표시. 카운트다운이 끝난 뒤부터 흐른다.
+  useEffect(() => {
+    if (counting || engine.status === 'cleared') return;
+    const timer = window.setInterval(() => setElapsed(engine.elapsedMs()), 100);
+    return () => window.clearInterval(timer);
+  }, [counting, engine, engine.status]);
+
+  // 막힘 안내 (PRD 5.3)
+  useEffect(() => {
+    if (engine.status !== 'stuck') {
+      wasStuck.current = false;
+      return;
+    }
+    if (wasStuck.current) return;
+    wasStuck.current = true;
+    const streak = stuckStreak + 1;
+    setStuckStreak(streak);
+    navigator.vibrate?.([15, 40, 15]);
+    const oddCount = oddNodes(stage).length;
+    if (streak >= 3 && oddCount === 2) {
+      setToast({
+        message: '시작점을 바꿔볼까요? 선이 홀수 개 모인 점에서 출발해 보세요.',
+        tone: 'warn',
+      });
+    } else {
+      setToast({ message: '이 길로는 다 못 지나가요. 되돌리기를 눌러 볼까요?', tone: 'warn' });
+    }
+  }, [engine.status, stage, stuckStreak]);
+
+  // 클리어 → 결과 화면
+  useEffect(() => {
+    if (engine.status !== 'cleared' || submitted.current) return;
+    submitted.current = true;
+    const timeMs = engine.elapsedMs();
+    const result = scoreForStage(stage, stage.edges.length, {
+      elapsedMs: timeMs,
+      undoCount: engine.undoCount,
+      hintCount: engine.hintCount,
+      resetCount: engine.resetCount,
+    });
+    const { improved, totalScore } = submitResult({
+      stage,
+      record: { score: result.score, timeMs, stars: result.stars },
+      play: {
+        stageId: stage.id,
+        cleared: true,
+        timeMs,
+        score: result.score,
+        stars: result.stars,
+        undoCount: engine.undoCount,
+        hintCount: engine.hintCount,
+        path: engine.usedEdges,
+      },
+    });
+    navigate('/result', {
+      replace: true,
+      state: {
+        stageId: stage.id,
+        stageName: stage.name,
+        edgeCount: stage.edges.length,
+        parTimeSec: stage.parTimeSec,
+        timeMs,
+        result,
+        improved,
+        totalScore,
+        clearMessage: stage.clearMessage,
+        generated: Boolean(onRegenerate),
+      },
+    });
+  }, [engine, navigate, onRegenerate, stage, submitResult]);
+
+  // PRD 7.1: 노트북 단축키
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z') engine.undo();
+      if (key === 'r') engine.reset();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [engine]);
+
+  const hintsLeft = HINT_LIMIT - engine.hintCount;
+
+  return (
+    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-3 pb-4 pt-3 landscape:max-w-4xl landscape:flex-row landscape:items-center landscape:gap-4">
+      <div className="landscape:flex-1">
+        <header className="flex items-center justify-between gap-2">
+          <Link
+            to="/stages"
+            className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500"
+            aria-label="스테이지 선택으로"
+          >
+            ← 목록
+          </Link>
+          <h1 className="truncate text-sm font-bold text-slate-900">
+            {stage.id} · {stage.name}
+          </h1>
+          <button
+            type="button"
+            onClick={() => setConceptOpen(true)}
+            className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500"
+          >
+            📘
+          </button>
+        </header>
+
+        <div className="mt-2 flex items-center justify-center gap-4 text-sm font-semibold text-slate-700">
+          <span>
+            남은 선{' '}
+            <b className="text-slate-900">
+              {engine.remainingEdges} / {engine.totalEdges}
+            </b>
+          </span>
+          <span aria-hidden="true" className="text-slate-300">
+            |
+          </span>
+          <span>
+            <span className="sr-only">경과 시간 </span>
+            {formatClock(elapsed)}
+            <span className="ml-1 text-xs font-normal text-slate-500">
+              (기준 {stage.parTimeSec}초)
+            </span>
+          </span>
+        </div>
+
+        {/*
+          캔버스는 정사각이라 가로 모드에서는 높이가 한계가 된다.
+          세로에서는 화면 폭의 92%(최대 560px), 가로에서는 남은 세로 공간에 맞춘다 (PRD 7.1).
+        */}
+        <div className="relative mx-auto mt-2 w-[92%] max-w-[560px] landscape:w-full landscape:max-w-[min(560px,calc(100dvh-7.5rem))]">
+          <div className="rounded-3xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+            <GameCanvas
+              stage={stage}
+              usedEdges={engine.usedEdgeSet}
+              currentNode={engine.currentNode}
+              hintNodes={engine.hintNodes}
+              oddView={oddView && oddViewAllowed}
+              hitRadius={draw.hitRadius}
+              pointerAt={draw.pointerAt}
+              svgRef={draw.svgRef}
+              handlers={draw.handlers}
+              shake={shake}
+            />
+          </div>
+          {counting && <Countdown onDone={() => {
+            setCounting(false);
+            engine.beginTimer();
+          }} />}
+        </div>
+
+        {engine.currentNode === null && !counting && (
+          <p className="mt-2 text-center text-sm text-slate-600 landscape:text-xs">
+            시작할 점을 누르세요. 그다음 이어진 점으로 손가락을 끌면 선이 그려집니다.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
+        <div className="grid grid-cols-4 gap-2 landscape:grid-cols-1">
+          <ControlButton label="되돌리기" sub="Z" icon="↩" onClick={engine.undo} highlight={engine.status === 'stuck'} />
+          <ControlButton
+            label="힌트"
+            sub={`${hintsLeft}회`}
+            icon="💡"
+            onClick={engine.hint}
+            disabled={hintsLeft <= 0}
+          />
+          <ControlButton label="다시하기" sub="R" icon="⟳" onClick={engine.reset} />
+          <ControlButton
+            label="홀수점"
+            sub={oddViewAllowed ? (oddView ? '켜짐' : '꺼짐') : '잠김'}
+            icon="◉"
+            onClick={() => setOddView((v) => !v)}
+            disabled={!oddViewAllowed}
+            active={oddView && oddViewAllowed}
+          />
+        </div>
+
+        {onRegenerate && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="mt-2 w-full rounded-2xl bg-slate-800 py-2.5 text-sm font-semibold text-white"
+          >
+            새 도형 받기
+          </button>
+        )}
+
+        <p className="mt-2 text-center text-[11px] text-slate-500">
+          되돌리기 -10점 · 힌트 -50점 · 다시하기 -20점
+        </p>
+      </div>
+
+      <Toast message={toast?.message ?? null} tone={toast?.tone} onDismiss={() => setToast(null)} />
+      {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}
+    </main>
+  );
+}
+
+function ControlButton({
+  label,
+  sub,
+  icon,
+  onClick,
+  disabled = false,
+  highlight = false,
+  active = false,
+}: {
+  label: string;
+  sub?: string;
+  icon: string;
+  onClick: () => void;
+  disabled?: boolean;
+  highlight?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex min-h-[56px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-xs font-semibold shadow-sm ring-1 transition-colors disabled:opacity-40 ${
+        highlight
+          ? 'bg-amber-100 text-amber-900 ring-amber-300'
+          : active
+            ? 'bg-teal-50 text-teal-800 ring-teal-300'
+            : 'bg-white text-slate-700 ring-slate-200'
+      }`}
+    >
+      <span aria-hidden="true" className="text-lg leading-none">
+        {icon}
+      </span>
+      <span className="mt-1">{label}</span>
+      {sub && <span className="text-[10px] font-normal text-slate-500">{sub}</span>}
+    </button>
+  );
+}

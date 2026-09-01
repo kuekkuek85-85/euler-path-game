@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// 한붓 챌린지 Firestore 보안 규칙 (PRD 6.4 기준 + 교사 모드 동작을 위한 보완)
+//
+// ⚠️ 알려진 한계 (PRD 6.4 각주와 동일)
+//   점수를 클라이언트에서 계산하는 구조이므로 개발자 도구를 다루는 학생은 기록 조작이
+//   가능하다. 아래 규칙은 값의 범위와 형태를 검증해 억제할 뿐 완전 차단은 못 한다.
+//   이 게임의 기록은 수행평가에 직접 반영하지 않는다는 전제로 운영한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ------------------------------------------------------------------
+    // students/{studentNo} — 문서 ID가 학번이라 중복 계정이 생길 수 없다.
+    // ------------------------------------------------------------------
+    match /students/{studentNo} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && studentNo.matches('^[0-9]{5}$')
+        && request.resource.data.studentNo == studentNo
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 5
+        && request.resource.data.totalScore == 0
+        && request.resource.data.clearedCount == 0;
+
+      allow update: if signedIn()
+        && request.resource.data.studentNo == resource.data.studentNo
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 5
+        // 점수는 감소할 수 없고, 1회 갱신 폭을 제한해 조작을 억제한다.
+        && request.resource.data.totalScore >= resource.data.totalScore
+        && request.resource.data.totalScore <= resource.data.totalScore + 2000
+        && request.resource.data.clearedCount >= resource.data.clearedCount;
+
+      // 오입력 학번 정리는 교사 모드에서 수행한다 (PRD 5.5).
+      // PRD 6.4 초안은 delete: if false 였으나, 그러면 교사 모드의 "개별 기록 삭제"가
+      // 콘솔 작업이 되어 수업 중에 쓸 수 없다. 아래 teacherMode() 안내를 참고해
+      // 운영 정책에 맞는 쪽을 고른다.
+      allow delete: if signedIn();
+    }
+
+    // ------------------------------------------------------------------
+    // plays/{playId} — 추가 전용 로그. 수정·삭제 불가.
+    // ------------------------------------------------------------------
+    match /plays/{playId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.studentNo is string
+        && request.resource.data.stageId is string
+        && request.resource.data.cleared is bool
+        && request.resource.data.timeMs is number
+        && request.resource.data.timeMs > 1000
+        && request.resource.data.score is number
+        && request.resource.data.score <= 2000
+        && request.resource.data.score >= 0;
+
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // config/global — 교사 설정 단일 문서
+    // ------------------------------------------------------------------
+    // PRD 6.4 초안은 write: if false 였다. 그러면 AC-08(교사 모드에서 대시보드를 끄면
+    // 학생 화면에서 메뉴가 사라진다)을 앱 안에서 만족할 수 없어, 필드 형태를 엄격히
+    // 검증하는 조건부 쓰기로 완화했다. 교사 모드 진입은 환경변수 PIN으로 막지만,
+    // 이 규칙 자체는 "로그인한 누구나"를 허용한다는 점을 인지하고 운영할 것.
+    //
+    // 더 단단히 잠그려면 아래 teacherMode()를 쓰고 config/admins 문서에
+    //   { uids: ["<교사 기기의 익명 uid>"] }
+    // 를 콘솔에서 한 번 넣어 준다. (교사 모드 화면에 uid가 표시된다)
+    //
+    //   function teacherMode() {
+    //     return signedIn()
+    //       && request.auth.uid in get(/databases/$(database)/documents/config/admins).data.uids;
+    //   }
+    //
+    match /config/global {
+      allow read: if true;
+      allow write: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['dashboardVisible', 'nameMasking', 'activeStages', 'oddViewUnlocked', 'updatedAt'])
+        && request.resource.data.dashboardVisible is bool
+        && request.resource.data.nameMasking is bool
+        && request.resource.data.oddViewUnlocked is bool
+        && request.resource.data.activeStages is list
+        && request.resource.data.activeStages.size() <= 40;
+    }
+
+    match /config/admins {
+      allow read: if signedIn();
+      allow write: if false;   // 콘솔에서만 편집
+    }
+
+    // 그 밖의 경로는 모두 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

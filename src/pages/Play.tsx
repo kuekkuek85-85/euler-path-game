@@ -159,7 +159,7 @@ function DrawBoard({ stage }: { stage: Stage }) {
   }, [engine, navigate, stage, submitResult]);
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-3 pb-4 pt-3 landscape:max-w-4xl landscape:flex-row landscape:items-center landscape:gap-4">
+    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-2 pb-4 pt-3 landscape:max-w-4xl landscape:flex-row landscape:items-center landscape:gap-4">
       <div className="landscape:flex-1">
         <header className="flex items-center justify-between gap-2">
           <Link
@@ -217,8 +217,8 @@ function DrawBoard({ stage }: { stage: Stage }) {
           캔버스는 정사각이라 가로 모드에서는 높이가 한계가 된다.
           세로에서는 화면 폭의 92%(최대 560px), 가로에서는 남은 세로 공간에 맞춘다 (PRD 7.1).
         */}
-        <div className="relative mx-auto mt-2 w-[92%] max-w-[560px] landscape:w-full landscape:max-w-[min(560px,calc(100dvh-7.5rem))]">
-          <div className="rounded-3xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+        <div className="relative mx-auto mt-2 w-full max-w-[560px] landscape:max-w-[min(560px,calc(100dvh-7.5rem))]">
+          <div className="rounded-3xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
             <GameCanvas
               stage={stage}
               usedEdges={engine.usedEdgeSet}

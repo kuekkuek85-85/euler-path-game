@@ -111,7 +111,7 @@ export function JudgeBoard({ stage }: { stage: Stage }) {
   };
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-3 pb-10 pt-3">
+    <main className="mx-auto w-full max-w-2xl px-2 pb-10 pt-3">
       <header className="flex items-center justify-between gap-2">
         <Link to="/stages" className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500">
           ← 목록
@@ -132,8 +132,8 @@ export function JudgeBoard({ stage }: { stage: Stage }) {
         판별 미션 — 그리지 말고 판단해 보세요
       </p>
 
-      <div className="mx-auto mt-3 w-[94%] max-w-[520px]">
-        <div className="rounded-3xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+      <div className="mx-auto mt-3 w-full max-w-[560px]">
+        <div className="rounded-3xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
           <GameCanvas
             stage={stage}
             usedEdges={EMPTY_USED}

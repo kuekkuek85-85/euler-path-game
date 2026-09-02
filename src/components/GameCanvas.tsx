@@ -90,14 +90,15 @@ export function GameCanvas({
             <path
               d={geometry.path}
               stroke="var(--color-line-used)"
-              strokeWidth={4}
+              strokeWidth={3}
               pathLength={1}
               className="edge-draw"
             />
+            {/* 선이 얇아진 만큼 체크 마크도 함께 줄여 선 밖으로 튀지 않게 한다 */}
             <path
-              d={`M ${geometry.midX - 1.6} ${geometry.midY} l 1.2 1.4 l 2.4 -3`}
+              d={`M ${geometry.midX - 1.35} ${geometry.midY} l 1 1.2 l 2 -2.5`}
               stroke="#ffffff"
-              strokeWidth={1.1}
+              strokeWidth={0.95}
               strokeLinejoin="round"
             />
           </g>

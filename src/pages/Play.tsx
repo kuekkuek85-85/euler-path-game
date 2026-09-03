@@ -36,10 +36,18 @@ function DrawBoard({ stage }: { stage: Stage }) {
   const [oddView, setOddView] = useState(false);
   const [conceptOpen, setConceptOpen] = useState(false);
   const [shake, setShake] = useState(false);
-  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const [toast, setToast] = useState<{ id: number; message: string; tone: ToastTone } | null>(null);
   const [stuckStreak, setStuckStreak] = useState(0);
   const submitted = useRef(false);
   const wasStuck = useRef(false);
+  /** 같은 문구가 다시 떠도 3초를 새로 세도록 매번 다른 id를 붙인다. */
+  const toastSeq = useRef(0);
+
+  const showToast = useCallback((message: string, tone: ToastTone) => {
+    toastSeq.current += 1;
+    setToast({ id: toastSeq.current, message, tone });
+  }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   // 홀수점 보기는 기본으로 숨긴다. 교사가 "홀수점 보기 열기"를 켰을 때만 나타난다
   // (수업 운영표의 "정리 1 — 홀수점 개념 설명" 시점에 여는 용도).
@@ -92,14 +100,11 @@ function DrawBoard({ stage }: { stage: Stage }) {
     navigator.vibrate?.([15, 40, 15]);
     const oddCount = oddNodes(stage).length;
     if (streak >= 3 && oddCount === 2) {
-      setToast({
-        message: '시작점을 바꿔볼까요? 선이 홀수 개 모인 점에서 출발해 보세요.',
-        tone: 'warn',
-      });
+      showToast('시작점을 바꿔볼까요? 선이 홀수 개 모인 점에서 출발해 보세요.', 'warn');
     } else {
-      setToast({ message: '이 길로는 다 못 지나가요. 다시 그려 볼까요?', tone: 'warn' });
+      showToast('이 길로는 다 못 지나가요. 다시 그려 볼까요?', 'warn');
     }
-  }, [engine.status, stage, stuckStreak]);
+  }, [engine.status, showToast, stage, stuckStreak]);
 
   // 붓을 뗐을 때 — 안내는 캔버스 위 오버레이가 하므로 진동만 준다.
   useEffect(() => {
@@ -111,11 +116,11 @@ function DrawBoard({ stage }: { stage: Stage }) {
   useEffect(() => {
     if (engine.strokeIndex <= 1) return;
     navigator.vibrate?.(20);
-    setToast({
-      message: `${engine.strokeIndex}번째 붓이에요. 남은 선이 있는 아무 점에서나 시작하세요.`,
-      tone: 'info',
-    });
-  }, [engine.strokeIndex]);
+    showToast(
+      `${engine.strokeIndex}번째 붓이에요. 남은 선이 있는 아무 점에서나 시작하세요.`,
+      'info',
+    );
+  }, [engine.strokeIndex, showToast]);
 
   // 클리어 → 결과 화면
   useEffect(() => {
@@ -312,7 +317,12 @@ function DrawBoard({ stage }: { stage: Stage }) {
         </div>
       )}
 
-      <Toast message={toast?.message ?? null} tone={toast?.tone} onDismiss={() => setToast(null)} />
+      <Toast
+        key={toast?.id ?? 'idle'}
+        message={toast?.message ?? null}
+        tone={toast?.tone}
+        onDismiss={dismissToast}
+      />
       {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}
     </main>
   );

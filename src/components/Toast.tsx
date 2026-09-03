@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export type ToastTone = 'info' | 'warn' | 'good';
 
@@ -13,18 +13,28 @@ export function Toast({
   message,
   tone = 'info',
   onDismiss,
-  duration = 2600,
+  duration = 3000,
 }: {
   message: string | null;
   tone?: ToastTone;
   onDismiss: () => void;
   duration?: number;
 }) {
+  /*
+    onDismiss 를 의존성에 그대로 넣으면 부모가 다시 그려질 때마다 타이머가 리셋된다.
+    플레이 화면은 경과 시간을 100ms마다 갱신하므로 타이머가 영영 끝나지 않아
+    안내가 사라지지 않았다. 최신 콜백은 ref로 들고, 타이머는 메시지가 바뀔 때만 건다.
+  */
+  const dismissRef = useRef(onDismiss);
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     if (!message) return;
-    const timer = window.setTimeout(onDismiss, duration);
+    const timer = window.setTimeout(() => dismissRef.current(), duration);
     return () => window.clearTimeout(timer);
-  }, [message, duration, onDismiss]);
+  }, [message, duration]);
 
   if (!message) return null;
   return (

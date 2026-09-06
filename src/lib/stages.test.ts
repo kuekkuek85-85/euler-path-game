@@ -19,7 +19,7 @@ import { generateCircuitStage, makeRng } from './generator';
  * 점·선 개수와 홀수점 개수를 여기에 못 박아 둔다. tier(레벨)는 이제 난이도 구분일 뿐
  * 홀수점 개수와 묶이지 않으므로, 그 검사를 graph.ts 대신 이 표가 맡는다.
  */
-const EXPECTED: Array<[id: string, level: 1 | 2, nodes: number, edges: number, odd: number]> = [
+const EXPECTED: Array<[id: string, level: 1 | 2 | 3, nodes: number, edges: number, odd: number]> = [
   ['L1-01', 1, 3, 3, 0],
   ['L1-02', 1, 8, 8, 0],
   ['L1-03', 1, 5, 7, 2],
@@ -40,6 +40,11 @@ const EXPECTED: Array<[id: string, level: 1 | 2, nodes: number, edges: number, o
   ['L2-08', 2, 10, 12, 2],
   ['L2-09', 2, 7, 12, 0],
   ['L2-10', 2, 10, 17, 2],
+  ['L3-01', 3, 9, 15, 2],
+  ['L3-02', 3, 11, 15, 2],
+  ['L3-03', 3, 11, 14, 0],
+  ['L3-04', 3, 9, 15, 0],
+  ['L3-05', 3, 6, 10, 2],
 ];
 
 describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
@@ -63,16 +68,14 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     });
   });
 
-  it('1레벨 10개 + 2레벨 10개, 3레벨은 아직 비어 있다', () => {
-    expect(STAGES).toHaveLength(20);
-    expect(MAIN_STAGES).toHaveLength(20);
-    expect(STAGES_BY_LEVEL[1].map((s) => s.id)).toEqual(
-      EXPECTED.filter(([, level]) => level === 1).map(([id]) => id),
-    );
-    expect(STAGES_BY_LEVEL[2].map((s) => s.id)).toEqual(
-      EXPECTED.filter(([, level]) => level === 2).map(([id]) => id),
-    );
-    expect(STAGES_BY_LEVEL[3]).toEqual([]);
+  it('레벨별 구성이 대조표와 일치한다', () => {
+    expect(STAGES).toHaveLength(EXPECTED.length);
+    expect(MAIN_STAGES).toHaveLength(EXPECTED.length);
+    for (const level of LEVELS) {
+      expect(STAGES_BY_LEVEL[level].map((s) => s.id)).toEqual(
+        EXPECTED.filter(([, lv]) => lv === level).map(([id]) => id),
+      );
+    }
     expect(LEVELS).toEqual([1, 2, 3]);
   });
 
@@ -148,15 +151,22 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     },
   );
 
-  it('한 레벨 안에서 선 개수가 대체로 늘어난다 — 뒤로 갈수록 어려워야 한다', () => {
+  it('1·2레벨은 뒤로 갈수록 선이 늘어난다', () => {
     for (const level of [1, 2] as const) {
       const counts = STAGES_BY_LEVEL[level].map((s) => s.edges.length);
       expect(counts[0]).toBeLessThan(counts[counts.length - 1]);
     }
-    // 2레벨 마지막이 1레벨 마지막보다 크다
     expect(STAGES_BY_LEVEL[2].at(-1)!.edges.length).toBeGreaterThan(
       STAGES_BY_LEVEL[1].at(-1)!.edges.length,
     );
+  });
+
+  it('3레벨은 1레벨보다 확실히 복잡하다', () => {
+    const level3 = STAGES_BY_LEVEL[3];
+    if (level3.length === 0) return;
+    const avg = (list: typeof level3) =>
+      list.reduce((sum, s) => sum + s.edges.length, 0) / list.length;
+    expect(avg(level3)).toBeGreaterThan(avg(STAGES_BY_LEVEL[1]));
   });
 
   it('좌표가 캔버스 안에 있고, 점끼리 충분히 떨어져 있다 (PRD 5.3 히트 영역)', () => {

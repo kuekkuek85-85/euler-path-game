@@ -9,7 +9,7 @@ import { classIdOf } from '../lib/format';
 const levelHeadings: Record<number, { title: string; hint: string }> = {
   1: { title: '1레벨 · 한붓그리기 첫걸음', hint: '점과 선이 적은 도형부터 차근차근' },
   2: { title: '2레벨 · 길이 많아진다', hint: '선이 많아도 규칙은 똑같아요' },
-  3: { title: '3레벨', hint: '준비 중이에요' },
+  3: { title: '3레벨 · 진짜 도전', hint: '점도 선도 많아요. 천천히 길을 그려 보세요' },
 };
 
 /** F2 · 스테이지 선택 — 잠금·별점·최고 기록을 한눈에 (PRD 5.1). */
@@ -91,9 +91,12 @@ export function StageSelect() {
         );
       })}
 
-      <p className="mt-8 rounded-2xl bg-white px-4 py-3 text-center text-xs text-slate-500 ring-1 ring-slate-200">
-        3레벨은 준비 중이에요. 조금만 기다려 주세요!
-      </p>
+      {/* 아직 데이터가 없는 레벨은 위 루프에서 통째로 빠지므로, 여기서 안내만 남긴다 */}
+      {STAGES_BY_LEVEL[3].length === 0 && (
+        <p className="mt-8 rounded-2xl bg-white px-4 py-3 text-center text-xs text-slate-500 ring-1 ring-slate-200">
+          3레벨은 준비 중이에요. 조금만 기다려 주세요!
+        </p>
+      )}
 
       {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}
     </main>

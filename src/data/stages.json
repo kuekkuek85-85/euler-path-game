@@ -4843,7 +4843,7 @@
     "tier": 5,
     "name": "지그재그",
     "type": "DRAW",
-    "parTimeSec": 44,
+    "parTimeSec": 48,
     "nodes": [
       {
         "id": "A",
@@ -4941,9 +4941,14 @@
         "id": "e11",
         "from": "R",
         "to": "Q"
+      },
+      {
+        "id": "e12",
+        "from": "B",
+        "to": "R"
       }
     ],
-    "clearMessage": "오른쪽 위 끝과 왼쪽 가운데가 홀수점이었어요.",
+    "clearMessage": "가운데 좌우 두 점이 홀수점! 오른쪽 세로선을 놓치지 않았네요.",
     "unlockedBy": "L5-02"
   },
   {

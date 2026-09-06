@@ -63,7 +63,7 @@ const EXPECTED: Array<[id: string, level: StageLevel, nodes: number, edges: numb
   ['L4-04', 4, 7, 11, 2],
   ['L4-05', 4, 10, 11, 2],
   ['L4-06', 4, 8, 14, 2],
-  ['L4-07', 4, 8, 12, 0],
+  ['L4-07', 4, 8, 12, 2],
   ['L4-08', 4, 13, 18, 2],
   ['L4-09', 4, 16, 28, 0],
   ['L4-10', 4, 16, 25, 2],
@@ -84,7 +84,7 @@ const EXPECTED: Array<[id: string, level: StageLevel, nodes: number, edges: numb
   ['L6-05', 6, 7, 15, 2],
   ['L6-06', 6, 13, 24, 0],
   ['L6-07', 6, 11, 20, 2],
-  ['L6-08', 6, 8, 10, 2],
+  ['L6-08', 6, 8, 11, 2],
   ['L6-09', 6, 12, 18, 2],
   ['L6-10', 6, 18, 20, 0],
 ];
@@ -262,6 +262,87 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
         }
       }
     }
+  });
+
+  /**
+   * 그림이 데이터와 다르게 보이는 사고를 잡는다.
+   *
+   * L4-02에서 실제로 났던 일: 긴 대각선 두 개의 교차점이 하필 어느 점의 자리라
+   * 교차점이 점 안에 완전히 묻혔다. 데이터상 그 점은 V의 꼭짓점(차수 2)인데
+   * 화면에서는 "네 갈래가 만나는 점"으로 보였다. 연결성·홀수점 검사로는 절대
+   * 잡히지 않는 종류의 오류라서 기하로 따로 본다.
+   */
+  describe('그림과 데이터가 어긋나 보이지 않는다', () => {
+    /** GameCanvas의 점 반지름. 이 안으로 선이 들어오면 붙은 것처럼 보인다. */
+    const NODE_R = 3.2;
+
+    const distToSegment = (
+      p: { x: number; y: number },
+      a: { x: number; y: number },
+      b: { x: number; y: number },
+    ) => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+      return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    };
+
+    /** 두 선분이 실제로 교차하면 그 점, 아니면 null. 끝점끼리 만나는 것은 제외한다. */
+    const crossing = (
+      a: { x: number; y: number },
+      b: { x: number; y: number },
+      c: { x: number; y: number },
+      d: { x: number; y: number },
+    ) => {
+      const den = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
+      if (Math.abs(den) < 1e-9) return null;
+      const t = ((a.x - c.x) * (c.y - d.y) - (a.y - c.y) * (c.x - d.x)) / den;
+      const u = ((a.x - c.x) * (a.y - b.y) - (a.y - c.y) * (a.x - b.x)) / den;
+      if (t <= 0 || t >= 1 || u <= 0 || u >= 1) return null;
+      return { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+    };
+
+    it.each(STAGES.map((s) => [s.id, s] as const))(
+      '%s — 간선이 무관한 점을 관통하지 않는다',
+      (_id, stage) => {
+        const pos = Object.fromEntries(stage.nodes.map((n) => [n.id, n]));
+        for (const edge of stage.edges) {
+          for (const node of stage.nodes) {
+            if (node.id === edge.from || node.id === edge.to) continue;
+            const gap = distToSegment(node, pos[edge.from], pos[edge.to]);
+            expect(gap, `${stage.id} ${edge.from}-${edge.to} 이 ${node.id} 를 지난다`).toBeGreaterThan(
+              NODE_R,
+            );
+          }
+        }
+      },
+    );
+
+    it.each(STAGES.map((s) => [s.id, s] as const))(
+      '%s — 간선 교차점이 점 안에 묻히지 않는다',
+      (_id, stage) => {
+        const pos = Object.fromEntries(stage.nodes.map((n) => [n.id, n]));
+        for (let i = 0; i < stage.edges.length; i += 1) {
+          for (let j = i + 1; j < stage.edges.length; j += 1) {
+            const e1 = stage.edges[i];
+            const e2 = stage.edges[j];
+            // 점을 공유하는 두 간선은 거기서 만나는 게 정상이다
+            if ([e2.from, e2.to].includes(e1.from) || [e2.from, e2.to].includes(e1.to)) continue;
+            const point = crossing(pos[e1.from], pos[e1.to], pos[e2.from], pos[e2.to]);
+            if (!point) continue;
+            for (const node of stage.nodes) {
+              const gap = Math.hypot(point.x - node.x, point.y - node.y);
+              expect(
+                gap,
+                `${stage.id} ${e1.from}-${e1.to} × ${e2.from}-${e2.to} 교차점이 ${node.id} 안에 있다`,
+              ).toBeGreaterThan(NODE_R);
+            }
+          }
+        }
+      },
+    );
   });
 
   it('간선이 같은 점을 잇거나 중복되지 않는다', () => {

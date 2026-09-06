@@ -203,28 +203,22 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     );
   });
 
-  /** 한 레벨은 미션 10개로 채운다. 채우는 중인 레벨은 아래 검사에서 빠진다. */
+  /** 한 레벨은 미션 10개. 1~6레벨 60개가 전부이고 7레벨은 없다. */
   const LEVEL_SIZE = 10;
 
-  it('다 채운 레벨끼리는 평균 선 개수가 단조 증가한다', () => {
+  it('레벨끼리 평균 선 개수가 단조 증가한다', () => {
     const avg = (list: Stage[]) =>
       list.reduce((sum, s) => sum + s.edges.length, 0) / list.length;
     // 이미지 순서를 그대로 지키므로 레벨 안에서는 들쭉날쭉하다. 레벨끼리의 평균만 본다.
-    // 채우는 중인 레벨은 평균이 아직 확정되지 않았으므로 제외한다.
-    const complete = LEVELS.filter((level) => STAGES_BY_LEVEL[level].length === LEVEL_SIZE);
-    const averages = complete.map((level) => avg(STAGES_BY_LEVEL[level]));
-    expect(averages.length).toBeGreaterThan(0);
+    const averages = LEVELS.map((level) => avg(STAGES_BY_LEVEL[level]));
     expect(averages).toEqual([...averages].sort((a, b) => a - b));
   });
 
-  it('레벨은 10개까지만 채운다 — 마지막 레벨만 덜 찰 수 있다', () => {
-    const sizes = LEVELS.map((level) => STAGES_BY_LEVEL[level].length);
-    for (const size of sizes) expect(size).toBeLessThanOrEqual(LEVEL_SIZE);
-    // 덜 찬 레벨 뒤에는 스테이지가 하나도 없어야 한다 (중간이 비면 잠금 사슬이 끊긴다)
-    const firstPartial = sizes.findIndex((size) => size < LEVEL_SIZE);
-    if (firstPartial >= 0) {
-      expect(sizes.slice(firstPartial + 1).every((size) => size === 0)).toBe(true);
-    }
+  it('여섯 레벨이 10개씩 빠짐없이 차 있다 — 이게 전부다', () => {
+    expect(LEVELS.map((level) => STAGES_BY_LEVEL[level].length)).toEqual(
+      LEVELS.map(() => LEVEL_SIZE),
+    );
+    expect(STAGES).toHaveLength(LEVELS.length * LEVEL_SIZE);
   });
 
   it('nextStage — 같은 학번으로 다시 들어와도 이어서 할 곳을 찾는다', () => {

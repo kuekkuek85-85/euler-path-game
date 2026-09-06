@@ -74,6 +74,7 @@ export function StageSelect() {
   if (!identity) return <Navigate to="/" replace />;
 
   const next = nextStage(profile?.best);
+  // 6레벨 60개가 전부다. 데이터가 없는 레벨은 애초에 카드도 만들지 않는다.
   const summaries: LevelSummary[] = LEVELS.filter(
     (level) => STAGES_BY_LEVEL[level].length > 0,
   ).map((level) => {
@@ -88,9 +89,6 @@ export function StageSelect() {
       current: next?.tier === level,
     };
   });
-
-  /** 아직 데이터가 없는 첫 레벨. 있으면 "준비 중" 안내를 띄운다. */
-  const comingLevel = LEVELS.find((level) => STAGES_BY_LEVEL[level].length === 0);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5">
@@ -140,12 +138,6 @@ export function StageSelect() {
           <LevelCard key={summary.level} summary={summary} index={index} />
         ))}
       </div>
-
-      {comingLevel && (
-        <p className="mt-6 rounded-2xl bg-white px-4 py-3 text-center text-xs text-slate-500 ring-1 ring-slate-200">
-          {comingLevel}레벨은 준비 중이에요. 조금만 기다려 주세요!
-        </p>
-      )}
 
       {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}
     </main>

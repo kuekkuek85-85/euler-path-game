@@ -1,6 +1,6 @@
 export type StageType = 'DRAW' | 'JUDGE';
 
-/** 난이도 레벨. 레벨을 늘릴 때 여기와 `data/stages.ts`의 LEVELS만 넓히면 된다. */
+/** 난이도 레벨. 1~6레벨 각 10개, 모두 60개가 전부다. */
 export type StageLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 /** 스테이지 뒤에 깔리는 장식 레이어 식별자 (PRD 4.2 S11 / B01). */

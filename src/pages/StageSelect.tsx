@@ -10,6 +10,9 @@ const levelHeadings: Record<number, { title: string; hint: string }> = {
   1: { title: '1레벨 · 한붓그리기 첫걸음', hint: '점과 선이 적은 도형부터 차근차근' },
   2: { title: '2레벨 · 길이 많아진다', hint: '선이 많아도 규칙은 똑같아요' },
   3: { title: '3레벨 · 진짜 도전', hint: '점도 선도 많아요. 천천히 길을 그려 보세요' },
+  4: { title: '4레벨 · 별자리', hint: '밤하늘에서 본 듯한 도형들' },
+  5: { title: '5레벨 · 얽힌 길', hint: '선이 겹치고 지나쳐도 규칙은 그대로예요' },
+  6: { title: '6레벨 · 마지막 관문', hint: '여기까지 왔다면 이미 고수예요' },
 };
 
 /** F2 · 스테이지 선택 — 잠금·별점·최고 기록을 한눈에 (PRD 5.1). */
@@ -18,6 +21,9 @@ export function StageSelect() {
   const [conceptOpen, setConceptOpen] = useState(false);
 
   if (!identity) return <Navigate to="/" replace />;
+
+  /** 아직 비어 있는 첫 레벨. 있으면 "준비 중" 안내를 띄운다. */
+  const nextLevel = LEVELS.find((level) => STAGES_BY_LEVEL[level].length === 0);
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5">
@@ -92,9 +98,9 @@ export function StageSelect() {
       })}
 
       {/* 아직 데이터가 없는 레벨은 위 루프에서 통째로 빠지므로, 여기서 안내만 남긴다 */}
-      {STAGES_BY_LEVEL[3].length === 0 && (
+      {nextLevel && (
         <p className="mt-8 rounded-2xl bg-white px-4 py-3 text-center text-xs text-slate-500 ring-1 ring-slate-200">
-          3레벨은 준비 중이에요. 조금만 기다려 주세요!
+          {nextLevel}레벨은 준비 중이에요. 조금만 기다려 주세요!
         </p>
       )}
 

@@ -1,5 +1,8 @@
 export type StageType = 'DRAW' | 'JUDGE';
 
+/** 난이도 레벨. 레벨을 늘릴 때 여기와 `data/stages.ts`의 LEVELS만 넓히면 된다. */
+export type StageLevel = 1 | 2 | 3 | 4 | 5 | 6;
+
 /** 스테이지 뒤에 깔리는 장식 레이어 식별자 (PRD 4.2 S11 / B01). */
 export type StageDecor = 'konigsberg' | 'fiveRooms';
 
@@ -33,11 +36,11 @@ export interface Stage {
   id: string;
   order: number;
   /**
-   * 난이도 레벨. 1 = 1레벨, 2 = 2레벨, 3 = 3레벨(추후 추가).
+   * 난이도 레벨. 작성자가 준 이미지의 "Level N-M"에서 N에 해당한다.
    * 예전에는 "홀수점 개수"를 뜻했으나, 2026-09-06 미션을 이미지 기준으로 다시 짜면서
    * 레벨 구분으로 바꿨다. 한 레벨 안에 회로형(홀수점 0개)과 경로형(2개)이 섞인다.
    */
-  tier: 1 | 2 | 3;
+  tier: StageLevel;
   name: string;
   type: StageType;
   parTimeSec: number;

@@ -1,4 +1,4 @@
-import type { Stage } from '../types';
+import type { Stage, StageLevel } from '../types';
 import { validateStage } from '../lib/graph';
 import raw from './stages.json';
 
@@ -14,14 +14,15 @@ export const STATIC_STAGES = STAGES;
 /** 대시보드·통계에서 쓰는 "전체 스테이지". 지금은 20개 전부가 본편이다. */
 export const MAIN_STAGES = STAGES.filter((stage) => !stage.bonus);
 
-/** 레벨별 묶음. 3레벨은 아직 비어 있고, 데이터를 추가하면 저절로 채워진다. */
-export const STAGES_BY_LEVEL: Record<1 | 2 | 3, Stage[]> = {
-  1: STAGES.filter((stage) => stage.tier === 1),
-  2: STAGES.filter((stage) => stage.tier === 2),
-  3: STAGES.filter((stage) => stage.tier === 3),
-};
+/**
+ * 레벨별 묶음. 데이터가 없는 레벨은 빈 배열이 되고, 화면에서 그 구역이 통째로 빠진다.
+ * 레벨을 늘릴 때는 LEVELS와 `types.ts`의 StageLevel만 넓히면 된다.
+ */
+export const LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
-export const LEVELS = [1, 2, 3] as const;
+export const STAGES_BY_LEVEL: Record<StageLevel, Stage[]> = Object.fromEntries(
+  LEVELS.map((level) => [level, STAGES.filter((stage) => stage.tier === level)]),
+) as Record<StageLevel, Stage[]>;
 
 export function getStage(id: string): Stage | undefined {
   return STAGE_BY_ID[id];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEVELS, MAIN_STAGES, STAGES, STAGES_BY_LEVEL, STATIC_STAGES } from '../data/stages';
-import type { Stage } from '../types';
+import type { Stage, StageLevel } from '../types';
 import {
   eulerStatus,
   minStrokes,
@@ -13,13 +13,13 @@ import {
 import { generateCircuitStage, makeRng } from './generator';
 
 /**
- * 2026-09-06 작성자가 준 이미지(Level 1-1 ~ 2-10) 20장을 옮긴 결과의 대조표.
+ * 작성자가 준 이미지(Level N-M)를 옮긴 결과의 대조표.
  *
  * 손으로 옮긴 좌표·간선이라 오타 하나면 "못 푸는 미션"이 배포된다. 그래서 도형마다
  * 점·선 개수와 홀수점 개수를 여기에 못 박아 둔다. tier(레벨)는 이제 난이도 구분일 뿐
  * 홀수점 개수와 묶이지 않으므로, 그 검사를 graph.ts 대신 이 표가 맡는다.
  */
-const EXPECTED: Array<[id: string, level: 1 | 2 | 3, nodes: number, edges: number, odd: number]> = [
+const EXPECTED: Array<[id: string, level: StageLevel, nodes: number, edges: number, odd: number]> = [
   ['L1-01', 1, 3, 3, 0],
   ['L1-02', 1, 8, 8, 0],
   ['L1-03', 1, 5, 7, 2],
@@ -50,6 +50,16 @@ const EXPECTED: Array<[id: string, level: 1 | 2 | 3, nodes: number, edges: numbe
   ['L3-08', 3, 7, 10, 0],
   ['L3-09', 3, 8, 10, 0],
   ['L3-10', 3, 9, 16, 2],
+  ['L4-01', 4, 12, 18, 0],
+  ['L4-02', 4, 7, 10, 0],
+  ['L4-03', 4, 8, 13, 2],
+  ['L4-04', 4, 7, 11, 2],
+  ['L4-05', 4, 10, 11, 2],
+  ['L4-06', 4, 8, 14, 2],
+  ['L4-07', 4, 8, 12, 0],
+  ['L4-08', 4, 13, 18, 2],
+  ['L4-09', 4, 16, 28, 0],
+  ['L4-10', 4, 16, 25, 2],
 ];
 
 describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
@@ -81,10 +91,10 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
         EXPECTED.filter(([, lv]) => lv === level).map(([id]) => id),
       );
     }
-    expect(LEVELS).toEqual([1, 2, 3]);
+    expect(LEVELS).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
-  it('모두 DRAW 한붓 스테이지다 — 판별·두붓 미션은 3레벨로 미뤘다', () => {
+  it('모두 DRAW 한붓 스테이지다 — 판별·두붓 미션은 뒤로 미뤘다', () => {
     for (const stage of STAGES) {
       expect(stage.type).toBe('DRAW');
       expect(stage.maxStrokes ?? 1).toBe(1);
@@ -166,12 +176,14 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     );
   });
 
-  it('3레벨은 1레벨보다 확실히 복잡하다', () => {
-    const level3 = STAGES_BY_LEVEL[3];
-    if (level3.length === 0) return;
-    const avg = (list: typeof level3) =>
+  it('레벨이 올라갈수록 평균 선 개수가 늘어난다', () => {
+    const avg = (list: Stage[]) =>
       list.reduce((sum, s) => sum + s.edges.length, 0) / list.length;
-    expect(avg(level3)).toBeGreaterThan(avg(STAGES_BY_LEVEL[1]));
+    const filled = LEVELS.filter((level) => STAGES_BY_LEVEL[level].length > 0);
+    const averages = filled.map((level) => avg(STAGES_BY_LEVEL[level]));
+    // 이미지 순서를 그대로 지키므로 레벨 안에서는 들쭉날쭉하지만,
+    // 레벨끼리는 평균이 단조 증가해야 "뒤로 갈수록 어렵다"가 성립한다.
+    expect(averages).toEqual([...averages].sort((a, b) => a - b));
   });
 
   it('좌표가 캔버스 안에 있고, 점끼리 충분히 떨어져 있다 (PRD 5.3 히트 영역)', () => {

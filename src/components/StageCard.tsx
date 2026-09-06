@@ -2,11 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Stage, StageRecord } from '../types';
 import { formatDuration } from '../lib/format';
 
-const tierLabel: Record<number, string> = {
-  1: '1레벨',
-  2: '2레벨',
-  3: '3레벨',
-};
+const tierLabel = (level: number) => `${level}레벨`;
 
 export function Stars({ count, size = 'text-base' }: { count: number; size?: string }) {
   return (
@@ -33,7 +29,7 @@ export function StageCard({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-xs font-semibold text-slate-500">
-            {tierLabel[stage.tier]} · {stage.id}
+            {tierLabel(stage.tier)} · {stage.id}
           </p>
           <p className="mt-0.5 text-base font-bold text-slate-900">{stage.name}</p>
         </div>

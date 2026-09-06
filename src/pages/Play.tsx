@@ -179,9 +179,9 @@ function DrawBoard({ stage }: { stage: Stage }) {
       <div className="landscape:flex-1">
         <header className="flex items-center justify-between gap-2">
           <Link
-            to="/stages"
+            to={`/stages/${stage.tier}`}
             className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500"
-            aria-label="스테이지 선택으로"
+            aria-label={`${stage.tier}레벨 미션 목록으로`}
           >
             ← 목록
           </Link>

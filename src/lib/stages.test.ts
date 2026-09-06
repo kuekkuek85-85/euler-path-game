@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LEVELS, MAIN_STAGES, STAGES, STAGES_BY_LEVEL, STATIC_STAGES } from '../data/stages';
+import {
+  LEVELS,
+  MAIN_STAGES,
+  STAGES,
+  STAGES_BY_LEVEL,
+  STATIC_STAGES,
+  nextStage,
+} from '../data/stages';
 import type { Stage, StageLevel } from '../types';
 import {
   eulerStatus,
@@ -218,6 +225,28 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     if (firstPartial >= 0) {
       expect(sizes.slice(firstPartial + 1).every((size) => size === 0)).toBe(true);
     }
+  });
+
+  it('nextStage — 같은 학번으로 다시 들어와도 이어서 할 곳을 찾는다', () => {
+    // 기록이 없으면 맨 처음
+    expect(nextStage(undefined)?.id).toBe(STAGES[0].id);
+    expect(nextStage({})?.id).toBe(STAGES[0].id);
+
+    // 앞에서부터 세 개를 깼으면 네 번째
+    const best: Record<string, unknown> = {};
+    for (const stage of STAGES.slice(0, 3)) best[stage.id] = { score: 1, timeMs: 1, stars: 1 };
+    expect(nextStage(best)?.id).toBe(STAGES[3].id);
+
+    // 중간에 구멍이 있으면 그 구멍이 먼저다 (사슬이 끊긴 기록을 안전하게 다룬다)
+    const holed: Record<string, unknown> = {};
+    for (const stage of STAGES.slice(0, 5)) holed[stage.id] = { score: 1, timeMs: 1, stars: 1 };
+    delete holed[STAGES[2].id];
+    expect(nextStage(holed)?.id).toBe(STAGES[2].id);
+
+    // 전부 깼으면 null
+    const all: Record<string, unknown> = {};
+    for (const stage of STAGES) all[stage.id] = { score: 1, timeMs: 1, stars: 1 };
+    expect(nextStage(all)).toBeNull();
   });
 
   it('좌표가 캔버스 안에 있고, 점끼리 충분히 떨어져 있다 (PRD 5.3 히트 영역)', () => {

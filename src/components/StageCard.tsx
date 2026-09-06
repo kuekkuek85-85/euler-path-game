@@ -18,11 +18,14 @@ export function StageCard({
   unlocked,
   record,
   index,
+  current = false,
 }: {
   stage: Stage;
   unlocked: boolean;
   record?: StageRecord;
   index: number;
+  /** 다음에 도전할 미션. 다시 들어와도 어디부터 할지 바로 보이게 강조한다. */
+  current?: boolean;
 }) {
   const body = (
     <>
@@ -31,7 +34,9 @@ export function StageCard({
           <p className="text-xs font-semibold text-slate-500">
             {tierLabel(stage.tier)} · {stage.id}
           </p>
-          <p className="mt-0.5 text-base font-bold text-slate-900">{stage.name}</p>
+          <p className="mt-0.5 line-clamp-2 min-h-[2.75rem] text-base font-bold text-slate-900">
+            {stage.name}
+          </p>
         </div>
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
@@ -50,7 +55,7 @@ export function StageCard({
         </span>
       </div>
 
-      <div className="mt-3 flex items-end justify-between">
+      <div className="mt-auto flex items-end justify-between pt-3">
         {unlocked ? (
           record ? (
             <div>
@@ -59,6 +64,8 @@ export function StageCard({
                 {record.score}점 · {stage.type === 'DRAW' ? formatDuration(record.timeMs) : '정답'}
               </p>
             </div>
+          ) : current ? (
+            <p className="text-xs font-bold text-blue-700">여기부터 도전!</p>
           ) : (
             <p className="text-xs font-semibold text-blue-600">도전하기</p>
           )
@@ -73,7 +80,7 @@ export function StageCard({
   );
 
   const baseClass =
-    'block rounded-2xl border p-4 text-left transition-transform active:scale-[0.98]';
+    'flex h-full flex-col rounded-2xl border p-4 text-left transition-transform active:scale-[0.98]';
 
   if (!unlocked) {
     return (
@@ -90,7 +97,9 @@ export function StageCard({
   return (
     <Link
       to={`/play/${stage.id}`}
-      className={`${baseClass} border-slate-200 bg-white shadow-sm hover:border-blue-300`}
+      className={`${baseClass} bg-white shadow-sm hover:border-blue-300 ${
+        current ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+      }`}
       style={{ animationDelay: `${index * 20}ms` }}
     >
       {body}

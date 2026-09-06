@@ -28,6 +28,15 @@ export function getStage(id: string): Stage | undefined {
   return STAGE_BY_ID[id];
 }
 
+/**
+ * 같은 학번·이름으로 다시 들어와도 이어서 하도록, "다음에 도전할 미션"을 찾는다.
+ * 스테이지가 order 순 사슬이라 아직 깨지 않은 첫 스테이지가 곧 이어서 할 곳이다.
+ * 전부 깼으면 null.
+ */
+export function nextStage(best: Record<string, unknown> | undefined): Stage | null {
+  return STAGES.find((stage) => !best?.[stage.id]) ?? null;
+}
+
 export function nextStageId(id: string): string | null {
   const index = STAGES.findIndex((s) => s.id === id);
   if (index < 0 || index + 1 >= STAGES.length) return null;

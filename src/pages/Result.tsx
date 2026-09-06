@@ -29,6 +29,8 @@ export function Result() {
 
   const next = nextStageId(state.stageId);
   const nextStage = next ? getStage(next) : undefined;
+  /** 방금 깬 스테이지 — "목록으로"를 그 레벨의 미션 목록으로 보내기 위해 쓴다. */
+  const playedStage = getStage(state.stageId);
   const nextAvailable = next ? isUnlocked(next) : false;
 
   return (
@@ -122,10 +124,10 @@ export function Result() {
           다시 도전
         </Link>
         <Link
-          to="/stages"
+          to={playedStage ? `/stages/${playedStage.tier}` : '/stages'}
           className="block rounded-2xl py-3 text-center font-semibold text-slate-500"
         >
-          스테이지 목록으로
+          미션 목록으로
         </Link>
       </div>
     </main>

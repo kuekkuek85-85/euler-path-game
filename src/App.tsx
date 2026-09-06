@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { SessionProvider } from './state/SessionContext';
 import { Entry } from './pages/Entry';
-import { StageSelect } from './pages/StageSelect';
+import { LevelStages, StageSelect } from './pages/StageSelect';
 import { Play } from './pages/Play';
 import { Result } from './pages/Result';
 
@@ -31,6 +31,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Entry />} />
             <Route path="/stages" element={<StageSelect />} />
+            <Route path="/stages/:level" element={<LevelStages />} />
             <Route path="/play/:stageId" element={<Play />} />
             <Route path="/result" element={<Result />} />
             <Route path="/dashboard" element={<Dashboard />} />

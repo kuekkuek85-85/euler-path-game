@@ -113,7 +113,10 @@ export function JudgeBoard({ stage }: { stage: Stage }) {
   return (
     <main className="mx-auto w-full max-w-2xl px-2 pb-10 pt-3">
       <header className="flex items-center justify-between gap-2">
-        <Link to="/stages" className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500">
+        <Link
+          to={`/stages/${stage.tier}`}
+          className="rounded-full px-2 py-1 text-sm font-semibold text-slate-500"
+        >
           ← 목록
         </Link>
         <h1 className="truncate text-sm font-bold text-slate-900">

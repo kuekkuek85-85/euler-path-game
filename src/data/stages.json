@@ -4957,7 +4957,7 @@
     "tier": 5,
     "name": "별 액자",
     "type": "DRAW",
-    "parTimeSec": 56,
+    "parTimeSec": 64,
     "nodes": [
       {
         "id": "T",
@@ -5003,73 +5003,83 @@
     "edges": [
       {
         "id": "e1",
-        "from": "A",
-        "to": "B"
+        "from": "T",
+        "to": "L"
       },
       {
         "id": "e2",
-        "from": "C",
-        "to": "D"
+        "from": "T",
+        "to": "R"
       },
       {
         "id": "e3",
         "from": "A",
-        "to": "C"
+        "to": "B"
       },
       {
         "id": "e4",
-        "from": "B",
-        "to": "D"
-      },
-      {
-        "id": "e5",
-        "from": "T",
+        "from": "A",
         "to": "L"
       },
       {
-        "id": "e6",
-        "from": "T",
+        "id": "e5",
+        "from": "A",
         "to": "R"
       },
       {
+        "id": "e6",
+        "from": "A",
+        "to": "C"
+      },
+      {
         "id": "e7",
-        "from": "U",
+        "from": "B",
         "to": "L"
       },
       {
         "id": "e8",
-        "from": "U",
+        "from": "B",
         "to": "R"
       },
       {
         "id": "e9",
-        "from": "A",
-        "to": "R"
-      },
-      {
-        "id": "e10",
         "from": "B",
-        "to": "L"
-      },
-      {
-        "id": "e11",
-        "from": "C",
-        "to": "R"
-      },
-      {
-        "id": "e12",
-        "from": "D",
-        "to": "L"
-      },
-      {
-        "id": "e13",
-        "from": "A",
         "to": "D"
       },
       {
-        "id": "e14",
-        "from": "B",
+        "id": "e10",
+        "from": "L",
         "to": "C"
+      },
+      {
+        "id": "e11",
+        "from": "L",
+        "to": "D"
+      },
+      {
+        "id": "e12",
+        "from": "L",
+        "to": "U"
+      },
+      {
+        "id": "e13",
+        "from": "R",
+        "to": "C"
+      },
+      {
+        "id": "e14",
+        "from": "R",
+        "to": "D"
+      },
+      {
+        "id": "e15",
+        "from": "R",
+        "to": "U"
+      },
+      {
+        "id": "e16",
+        "from": "C",
+        "to": "D"
       }
     ],
     "clearMessage": "액자와 별이 겹친 도형! 홀수점이 없어 어디서나 시작해도 돼요.",

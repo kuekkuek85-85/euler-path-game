@@ -14,6 +14,14 @@ import { Toast, type ToastTone } from '../components/Toast';
 import { useSession } from '../state/sessionStore';
 import { JudgeBoard } from './JudgeBoard';
 
+/**
+ * 붓을 뗀 뒤 오버레이가 저절로 걷히기까지의 시간.
+ * 오버레이를 벗어나는 길은 판을 처음으로 되돌리는 것뿐이라, 사라진다는 것은
+ * 곧 "다시 그리기"를 대신 눌러 준다는 뜻이다. 손이 미끄러졌을 때 매번
+ * 버튼을 찾아 누르게 하지 않는다 (PRD 7.4).
+ */
+const BROKEN_AUTO_RESET_MS = 3000;
+
 export function Play() {
   const { stageId = '' } = useParams();
   const { identity, isUnlocked } = useSession();
@@ -107,10 +115,13 @@ function DrawBoard({ stage }: { stage: Stage }) {
   }, [engine.status, showToast, stage, stuckStreak]);
 
   // 붓을 뗐을 때 — 안내는 캔버스 위 오버레이가 하므로 진동만 준다.
+  // 3초 뒤에는 오버레이를 스스로 걷고 판을 처음으로 되돌린다 (작성자 요청).
   useEffect(() => {
     if (engine.status !== 'broken') return;
     navigator.vibrate?.([15, 40, 15]);
-  }, [engine.status]);
+    const timer = window.setTimeout(engine.reset, BROKEN_AUTO_RESET_MS);
+    return () => window.clearTimeout(timer);
+  }, [engine.reset, engine.status]);
 
   // 두붓 스테이지에서 다음 붓으로 넘어갔을 때
   useEffect(() => {
@@ -273,6 +284,13 @@ function DrawBoard({ stage }: { stage: Stage }) {
               >
                 다시 그리기
               </button>
+              {/* 3초 뒤 저절로 다시 시작한다는 것을 눈으로도 알려 준다 */}
+              <div className="w-40">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div className="countdown-bar h-full w-full rounded-full bg-blue-400" />
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500">잠시 뒤 저절로 다시 시작해요</p>
+              </div>
             </div>
           )}
         </div>

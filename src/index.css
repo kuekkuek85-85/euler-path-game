@@ -105,10 +105,26 @@ body {
   animation: pop-in 0.22s ease-out both;
 }
 
+/* 붓을 뗀 안내가 저절로 걷히기까지 남은 시간을 보여 주는 막대 */
+@keyframes countdown-bar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.countdown-bar {
+  transform-origin: left center;
+  animation: countdown-bar 3s linear both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-shake,
   .hint-pulse,
   .animate-pop-in,
+  .countdown-bar,
   .edge-draw {
     animation: none;
   }

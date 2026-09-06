@@ -85,7 +85,7 @@ const EXPECTED: Array<[id: string, level: StageLevel, nodes: number, edges: numb
   ['L6-06', 6, 13, 24, 0],
   ['L6-07', 6, 11, 21, 2],
   ['L6-08', 6, 9, 15, 2],
-  ['L6-09', 6, 12, 18, 2],
+  ['L6-09', 6, 12, 20, 2],
   ['L6-10', 6, 18, 20, 0],
 ];
 

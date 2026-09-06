@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  BONUS_STAGES,
-  MAIN_STAGES,
-  MULTI_STROKE_STAGES,
-  PATH_CHALLENGE_STAGES,
-  STAGES,
-  STATIC_STAGES,
-} from '../data/stages';
+import { LEVELS, MAIN_STAGES, STAGES, STAGES_BY_LEVEL, STATIC_STAGES } from '../data/stages';
+import type { Stage } from '../types';
 import {
   eulerStatus,
   minStrokes,
@@ -17,6 +11,36 @@ import {
   validateStage,
 } from './graph';
 import { generateCircuitStage, makeRng } from './generator';
+
+/**
+ * 2026-09-06 작성자가 준 이미지(Level 1-1 ~ 2-10) 20장을 옮긴 결과의 대조표.
+ *
+ * 손으로 옮긴 좌표·간선이라 오타 하나면 "못 푸는 미션"이 배포된다. 그래서 도형마다
+ * 점·선 개수와 홀수점 개수를 여기에 못 박아 둔다. tier(레벨)는 이제 난이도 구분일 뿐
+ * 홀수점 개수와 묶이지 않으므로, 그 검사를 graph.ts 대신 이 표가 맡는다.
+ */
+const EXPECTED: Array<[id: string, level: 1 | 2, nodes: number, edges: number, odd: number]> = [
+  ['L1-01', 1, 3, 3, 0],
+  ['L1-02', 1, 8, 8, 0],
+  ['L1-03', 1, 5, 7, 2],
+  ['L1-04', 1, 5, 7, 2],
+  ['L1-05', 1, 5, 6, 0],
+  ['L1-06', 1, 5, 5, 0],
+  ['L1-07', 1, 5, 8, 2],
+  ['L1-08', 1, 8, 12, 0],
+  ['L1-09', 1, 6, 9, 2],
+  ['L1-10', 1, 7, 11, 2],
+  ['L2-01', 2, 7, 10, 2],
+  ['L2-02', 2, 5, 6, 2],
+  ['L2-03', 2, 7, 10, 2],
+  ['L2-04', 2, 6, 9, 2],
+  ['L2-05', 2, 7, 14, 2],
+  ['L2-06', 2, 6, 10, 2],
+  ['L2-07', 2, 10, 13, 2],
+  ['L2-08', 2, 10, 12, 2],
+  ['L2-09', 2, 7, 12, 0],
+  ['L2-10', 2, 10, 17, 2],
+];
 
 describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
   it('id와 order가 중복되지 않는다', () => {
@@ -29,62 +53,54 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     expect([...orders].sort((a, b) => a - b)).toEqual(orders);
   });
 
-  it('unlockedBy가 앞선 스테이지를 가리킨다', () => {
-    const orderById = new Map(STAGES.map((s) => [s.id, s.order]));
-    for (const stage of STAGES) {
-      if (!stage.unlockedBy) continue;
-      expect(orderById.has(stage.unlockedBy)).toBe(true);
-      expect(orderById.get(stage.unlockedBy)!).toBeLessThan(stage.order);
-    }
-  });
-
-  it('본편 12 + 보너스 6 + 도전 경로 3 + 두붓 4로 구성된다', () => {
-    expect(MAIN_STAGES).toHaveLength(12);
-    expect(BONUS_STAGES.map((s) => s.id)).toEqual(['B01', 'B02', 'B03', 'B04', 'B05', 'B06']);
-    expect(PATH_CHALLENGE_STAGES.map((s) => s.id)).toEqual(['D01', 'D02', 'D03']);
-    expect(MULTI_STROKE_STAGES.map((s) => s.id)).toEqual(['C01', 'C02', 'C03', 'C04']);
-  });
-
-  it('도전 경로 3종은 홀수점이 정확히 2개다 — 시작점을 골라야 한다', () => {
-    for (const stage of PATH_CHALLENGE_STAGES) {
-      expect(oddNodes(stage)).toHaveLength(2);
-      expect(eulerStatus(stage)).toBe('path');
-      // 두 홀수점에서만 풀리고, 나머지 점에서는 반드시 막힌다
-      const starts = validStartNodes(stage);
-      expect(starts).toHaveLength(2);
-      for (const node of stage.nodes) {
-        const path = solve(stage, node.id);
-        if (starts.includes(node.id)) expect(path).toHaveLength(stage.edges.length);
-        else expect(path).toBeNull();
+  it('unlockedBy가 바로 앞 스테이지를 가리킨다 — 첫 스테이지만 열려 있다', () => {
+    STAGES.forEach((stage, index) => {
+      if (index === 0) {
+        expect(stage.unlockedBy).toBeNull();
+        return;
       }
-    }
+      expect(stage.unlockedBy).toBe(STAGES[index - 1].id);
+    });
   });
 
-  it('도전 경로는 간선 수가 뒤로 갈수록 늘어난다', () => {
-    const counts = PATH_CHALLENGE_STAGES.map((s) => s.edges.length);
-    expect(counts).toEqual([13, 15, 17]);
-  });
-
-  it('도전 회로 5종은 모두 짝수점뿐인 오일러 회로다', () => {
-    for (const id of ['B02', 'B03', 'B04', 'B05', 'B06']) {
-      const stage = STAGES.find((s) => s.id === id)!;
-      expect(oddNodes(stage)).toEqual([]);
-      expect(eulerStatus(stage)).toBe('circuit');
-      expect(stage.edges.length).toBeGreaterThanOrEqual(12);
-      expect(solve(stage)).toHaveLength(stage.edges.length);
-    }
-  });
-
-  it('도전 회로는 간선 수가 뒤로 갈수록 늘어난다', () => {
-    const counts = ['B02', 'B03', 'B04', 'B05', 'B06'].map(
-      (id) => STAGES.find((s) => s.id === id)!.edges.length,
+  it('1레벨 10개 + 2레벨 10개, 3레벨은 아직 비어 있다', () => {
+    expect(STAGES).toHaveLength(20);
+    expect(MAIN_STAGES).toHaveLength(20);
+    expect(STAGES_BY_LEVEL[1].map((s) => s.id)).toEqual(
+      EXPECTED.filter(([, level]) => level === 1).map(([id]) => id),
     );
-    expect(counts).toEqual([...counts].sort((a, b) => a - b));
-    expect(counts).toEqual([12, 13, 14, 16, 18]);
+    expect(STAGES_BY_LEVEL[2].map((s) => s.id)).toEqual(
+      EXPECTED.filter(([, level]) => level === 2).map(([id]) => id),
+    );
+    expect(STAGES_BY_LEVEL[3]).toEqual([]);
+    expect(LEVELS).toEqual([1, 2, 3]);
   });
+
+  it('모두 DRAW 한붓 스테이지다 — 판별·두붓 미션은 3레벨로 미뤘다', () => {
+    for (const stage of STAGES) {
+      expect(stage.type).toBe('DRAW');
+      expect(stage.maxStrokes ?? 1).toBe(1);
+      expect(stage.bonus ?? false).toBe(false);
+    }
+    expect(STAGES.filter((s) => (s.maxStrokes ?? 1) > 1)).toEqual([]);
+  });
+
+  it.each(EXPECTED)(
+    '%s — 이미지대로 점 %i개 · 선 %i개 · 홀수점 %i개다',
+    (id, level, nodeCount, edgeCount, oddCount) => {
+      const stage = STAGES.find((s) => s.id === id) as Stage;
+      expect(stage).toBeDefined();
+      expect(stage.tier).toBe(level);
+      expect(stage.nodes).toHaveLength(nodeCount);
+      expect(stage.edges).toHaveLength(edgeCount);
+      expect(oddNodes(stage)).toHaveLength(oddCount);
+      expect(eulerStatus(stage)).toBe(oddCount === 0 ? 'circuit' : 'path');
+      expect(minStrokes(stage)).toBe(1);
+    },
+  );
 
   it.each(STATIC_STAGES.map((s) => [s.id, s] as const))(
-    '%s — 연결성·홀수점·tier·해 존재를 모두 만족한다',
+    '%s — 연결성·홀수점·해 존재를 모두 만족한다',
     (_id, stage) => {
       const result = validateStage(stage);
       expect(result.problems).toEqual([]);
@@ -92,11 +108,7 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     },
   );
 
-  it.each(
-    STATIC_STAGES.filter((s) => s.type === 'DRAW' && (s.maxStrokes ?? 1) === 1).map(
-      (s) => [s.id, s] as const,
-    ),
-  )(
+  it.each(STATIC_STAGES.map((s) => [s.id, s] as const))(
     '%s — 허용된 모든 시작점에서 실제 해가 나온다',
     (_id, stage) => {
       const starts = validStartNodes(stage);
@@ -110,90 +122,109 @@ describe('스테이지 데이터 무결성 (PRD 4.3 / AC-04)', () => {
     },
   );
 
-  it('S06은 짝수점 B·D에서 시작하면 해가 없다 (AC-03)', () => {
-    const stage = STAGES.find((s) => s.id === 'S06')!;
-    expect(oddNodes(stage)).toEqual(['A', 'C']);
-    expect(solve(stage, 'B')).toBeNull();
-    expect(solve(stage, 'D')).toBeNull();
-    expect(solve(stage, 'A')).toHaveLength(5);
+  it.each(EXPECTED.filter(([, , , , odd]) => odd === 2).map(([id]) => [id] as const))(
+    '%s — 홀수점 2개에서만 풀리고 나머지 점에서는 반드시 막힌다',
+    (id) => {
+      const stage = STAGES.find((s) => s.id === id) as Stage;
+      const starts = validStartNodes(stage);
+      expect(starts).toEqual(oddNodes(stage));
+      expect(starts).toHaveLength(2);
+      for (const node of stage.nodes) {
+        const path = solve(stage, node.id);
+        if (starts.includes(node.id)) expect(path).toHaveLength(stage.edges.length);
+        else expect(path).toBeNull();
+      }
+    },
+  );
+
+  it.each(EXPECTED.filter(([, , , , odd]) => odd === 0).map(([id]) => [id] as const))(
+    '%s — 홀수점이 없어 어느 점에서 시작해도 풀린다',
+    (id) => {
+      const stage = STAGES.find((s) => s.id === id) as Stage;
+      expect(validStartNodes(stage).sort()).toEqual(stage.nodes.map((n) => n.id).sort());
+      for (const node of stage.nodes) {
+        expect(solve(stage, node.id)).toHaveLength(stage.edges.length);
+      }
+    },
+  );
+
+  it('한 레벨 안에서 선 개수가 대체로 늘어난다 — 뒤로 갈수록 어려워야 한다', () => {
+    for (const level of [1, 2] as const) {
+      const counts = STAGES_BY_LEVEL[level].map((s) => s.edges.length);
+      expect(counts[0]).toBeLessThan(counts[counts.length - 1]);
+    }
+    // 2레벨 마지막이 1레벨 마지막보다 크다
+    expect(STAGES_BY_LEVEL[2].at(-1)!.edges.length).toBeGreaterThan(
+      STAGES_BY_LEVEL[1].at(-1)!.edges.length,
+    );
   });
 
-  it('S08 니콜라우스의 집은 홀수점이 A·B다', () => {
-    const stage = STAGES.find((s) => s.id === 'S08')!;
-    expect(stage.edges).toHaveLength(8);
-    expect(oddNodes(stage)).toEqual(['A', 'B']);
-    expect(eulerStatus(stage)).toBe('path');
-  });
-
-  it('S11 쾨니히스베르크는 불가능하고 최소 2붓이다', () => {
-    const stage = STAGES.find((s) => s.id === 'S11')!;
-    expect(stage.edges).toHaveLength(7);
-    expect(eulerStatus(stage)).toBe('impossible');
-    expect(minStrokes(stage)).toBe(2);
-    expect(stage.answer).toEqual({
-      solvable: false,
-      minStrokes: 2,
-      oddNodes: ['N', 'I', 'S', 'E'],
-    });
-  });
-
-  it('S12 육각 별은 간선 18개짜리 오일러 회로다', () => {
-    const stage = STAGES.find((s) => s.id === 'S12')!;
-    expect(stage.edges).toHaveLength(18);
-    expect(eulerStatus(stage)).toBe('circuit');
-  });
-
-  it('B01 5개의 방 퍼즐은 홀수점 4개로 불가능하다', () => {
-    const stage = STAGES.find((s) => s.id === 'B01')!;
-    expect(stage.edges).toHaveLength(16);
-    expect(eulerStatus(stage)).toBe('impossible');
-    expect(minStrokes(stage)).toBe(2);
-  });
-
-  it.each(
-    STATIC_STAGES.filter((s) => (s.maxStrokes ?? 1) > 1).map((s) => [s.id, s] as const),
-  )('%s — 선언한 붓 수로 실제 해가 나오고, 한 붓으로는 불가능하다', (_id, stage) => {
-    const strokes = solveInStrokes(stage);
-    expect(strokes).not.toBeNull();
-    expect(strokes).toHaveLength(stage.maxStrokes!);
-    // 모든 간선을 정확히 한 번씩 덮는다
-    const covered = strokes!.flat();
-    expect(covered).toHaveLength(stage.edges.length);
-    expect(new Set(covered).size).toBe(stage.edges.length);
-    // 한 붓으로는 못 그린다 — 그럴 수 있으면 두붓 스테이지일 이유가 없다
-    expect(minStrokes(stage)).toBe(stage.maxStrokes);
-    expect(solve(stage)).toBeNull();
-    expect(oddNodes(stage)).toHaveLength(2 * stage.maxStrokes!);
-  });
-
-  it('두붓 스테이지 4개가 있다', () => {
-    const two = STAGES.filter((s) => (s.maxStrokes ?? 1) === 2);
-    expect(two.map((s) => s.id)).toEqual(['C01', 'C02', 'C03', 'C04']);
-  });
-
-  it('C03·C04는 S11·B01과 같은 도형이다 — 판정한 것을 실제로 그려 본다', () => {
-    const pairs: [string, string][] = [
-      ['C03', 'S11'],
-      ['C04', 'B01'],
-    ];
-    for (const [draw, judge] of pairs) {
-      const d = STAGES.find((s) => s.id === draw)!;
-      const j = STAGES.find((s) => s.id === judge)!;
-      expect(d.edges.map((e) => e.id)).toEqual(j.edges.map((e) => e.id));
-      expect(d.maxStrokes).toBe(j.answer!.minStrokes);
+  it('좌표가 캔버스 안에 있고, 점끼리 충분히 떨어져 있다 (PRD 5.3 히트 영역)', () => {
+    for (const stage of STAGES) {
+      for (const node of stage.nodes) {
+        expect(node.x).toBeGreaterThanOrEqual(5);
+        expect(node.x).toBeLessThanOrEqual(95);
+        expect(node.y).toBeGreaterThanOrEqual(5);
+        expect(node.y).toBeLessThanOrEqual(95);
+      }
+      for (let i = 0; i < stage.nodes.length; i += 1) {
+        for (let j = i + 1; j < stage.nodes.length; j += 1) {
+          const a = stage.nodes[i];
+          const b = stage.nodes[j];
+          const gap = Math.hypot(a.x - b.x, a.y - b.y);
+          // 캔버스 폭 362px 기준 12 viewBox 단위 ≈ 43px. 손가락 하나가 두 점을
+          // 동시에 덮지 않을 최소치다.
+          expect(gap, `${stage.id} ${a.id}-${b.id}`).toBeGreaterThanOrEqual(12);
+        }
+      }
     }
   });
 
-  it('tier 1은 전부 회로, tier 2는 전부 경로다', () => {
-    for (const stage of STATIC_STAGES) {
-      if (stage.tier === 1) expect(eulerStatus(stage)).toBe('circuit');
-      if (stage.tier === 2) expect(eulerStatus(stage)).toBe('path');
+  it('간선이 같은 점을 잇거나 중복되지 않는다', () => {
+    for (const stage of STAGES) {
+      const nodeIds = new Set(stage.nodes.map((n) => n.id));
+      const seen = new Set<string>();
+      for (const edge of stage.edges) {
+        expect(nodeIds.has(edge.from), `${stage.id} ${edge.id}.from`).toBe(true);
+        expect(nodeIds.has(edge.to), `${stage.id} ${edge.id}.to`).toBe(true);
+        expect(edge.from).not.toBe(edge.to);
+        const key = [edge.from, edge.to].sort().join('-');
+        // 같은 두 점을 잇는 선이 둘 이상이면 curve로 구분해야 한다 (지금은 없다)
+        expect(seen.has(key), `${stage.id} 중복 간선 ${key}`).toBe(false);
+        seen.add(key);
+      }
     }
+  });
+
+  it('기준 시간이 선 개수에 맞게 커진다', () => {
+    for (const stage of STAGES) {
+      expect(stage.parTimeSec).toBeGreaterThanOrEqual(stage.edges.length * 2);
+      expect(stage.parTimeSec).toBeLessThanOrEqual(stage.edges.length * 6);
+    }
+  });
+
+  it('두붓 이상 스테이지는 없지만, 있을 경우의 검사는 살아 있다', () => {
+    const multi = STATIC_STAGES.filter((s) => (s.maxStrokes ?? 1) > 1);
+    for (const stage of multi) {
+      const strokes = solveInStrokes(stage);
+      expect(strokes).toHaveLength(stage.maxStrokes!);
+    }
+    expect(multi).toHaveLength(0);
   });
 });
 
-describe('B02 도전 회로 생성기', () => {
-  const template = STAGES.find((s) => s.id === 'B02')!;
+describe('도형 생성기 (3레벨 도형을 뽑을 때 쓰는 설계용 도구)', () => {
+  /** 생성기는 좌표·par만 참고하므로 스테이지 데이터에 기대지 않는 최소 템플릿을 쓴다. */
+  const template: Stage = {
+    id: 'TMPL',
+    order: 0,
+    tier: 3,
+    name: '생성기 템플릿',
+    type: 'DRAW',
+    parTimeSec: 60,
+    nodes: [],
+    edges: [],
+  };
 
   it.each([1, 2, 3, 42, 1234, 98765].map((seed) => [seed] as const))(
     'seed %i — 항상 연결된 오일러 회로를 만든다',

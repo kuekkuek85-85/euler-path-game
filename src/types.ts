@@ -32,7 +32,11 @@ export interface JudgeAnswer {
 export interface Stage {
   id: string;
   order: number;
-  /** 1 = 홀수점 0개, 2 = 홀수점 2개, 3 = 복합·판별 */
+  /**
+   * 난이도 레벨. 1 = 1레벨, 2 = 2레벨, 3 = 3레벨(추후 추가).
+   * 예전에는 "홀수점 개수"를 뜻했으나, 2026-09-06 미션을 이미지 기준으로 다시 짜면서
+   * 레벨 구분으로 바꿨다. 한 레벨 안에 회로형(홀수점 0개)과 경로형(2개)이 섞인다.
+   */
   tier: 1 | 2 | 3;
   name: string;
   type: StageType;

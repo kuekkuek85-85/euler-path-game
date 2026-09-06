@@ -1,20 +1,15 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import {
-  BONUS_STAGES,
-  MAIN_STAGES,
-  MULTI_STROKE_STAGES,
-  PATH_CHALLENGE_STAGES,
-} from '../data/stages';
+import { LEVELS, STAGES_BY_LEVEL } from '../data/stages';
 import { StageCard } from '../components/StageCard';
 import { ConceptCard } from '../components/ConceptCard';
 import { useSession } from '../state/sessionStore';
 import { classIdOf } from '../lib/format';
 
-const tierHeadings: Record<number, { title: string; hint: string }> = {
-  1: { title: '1단계 · 어디서 시작해도 된다', hint: '홀수점이 하나도 없는 도형들' },
-  2: { title: '2단계 · 시작점을 골라야 한다', hint: '홀수점이 둘인 도형들' },
-  3: { title: '3단계 · 규칙을 적용한다', hint: '복잡한 도형과 판별 미션' },
+const levelHeadings: Record<number, { title: string; hint: string }> = {
+  1: { title: '1레벨 · 한붓그리기 첫걸음', hint: '점과 선이 적은 도형부터 차근차근' },
+  2: { title: '2레벨 · 길이 많아진다', hint: '선이 많아도 규칙은 똑같아요' },
+  3: { title: '3레벨', hint: '준비 중이에요' },
 };
 
 /** F2 · 스테이지 선택 — 잠금·별점·최고 기록을 한눈에 (PRD 5.1). */
@@ -23,8 +18,6 @@ export function StageSelect() {
   const [conceptOpen, setConceptOpen] = useState(false);
 
   if (!identity) return <Navigate to="/" replace />;
-
-  const tiers = [1, 2, 3] as const;
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-5">
@@ -70,13 +63,19 @@ export function StageSelect() {
         )}
       </nav>
 
-      {tiers.map((tier) => {
-        const stages = MAIN_STAGES.filter((stage) => stage.tier === tier);
+      {LEVELS.map((level) => {
+        const stages = STAGES_BY_LEVEL[level];
         if (stages.length === 0) return null;
+        const cleared = stages.filter((stage) => profile?.best[stage.id]).length;
         return (
-          <section key={tier} className="mt-7">
-            <h2 className="text-sm font-bold text-slate-800">{tierHeadings[tier].title}</h2>
-            <p className="text-xs text-slate-500">{tierHeadings[tier].hint}</p>
+          <section key={level} className="mt-7">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-bold text-slate-800">{levelHeadings[level].title}</h2>
+              <span className="shrink-0 text-xs font-semibold text-slate-500">
+                {cleared} / {stages.length}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">{levelHeadings[level].hint}</p>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {stages.map((stage, index) => (
                 <StageCard
@@ -92,57 +91,9 @@ export function StageSelect() {
         );
       })}
 
-      <section className="mt-8">
-        <h2 className="text-sm font-bold text-slate-800">보너스</h2>
-        <p className="text-xs text-slate-500">S12를 깨면 열립니다</p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {BONUS_STAGES.map((stage, index) => (
-            <StageCard
-              key={stage.id}
-              stage={stage}
-              index={index}
-              unlocked={isUnlocked(stage.id)}
-              record={profile?.best[stage.id]}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="text-sm font-bold text-orange-800">도전 경로 · 시작점을 찾아라</h2>
-        <p className="text-xs text-slate-500">
-          점이 많아도 홀수점은 딱 둘. 그 둘 중 하나에서 출발해야만 풀립니다.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {PATH_CHALLENGE_STAGES.map((stage, index) => (
-            <StageCard
-              key={stage.id}
-              stage={stage}
-              index={index}
-              unlocked={isUnlocked(stage.id)}
-              record={profile?.best[stage.id]}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="text-sm font-bold text-violet-800">두붓 그리기</h2>
-        <p className="text-xs text-slate-500">
-          홀수점이 4개라 한 붓으로는 안 되는 도형들. 붓을 한 번 떼서 두 획으로 그립니다.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {MULTI_STROKE_STAGES.map((stage, index) => (
-            <StageCard
-              key={stage.id}
-              stage={stage}
-              index={index}
-              unlocked={isUnlocked(stage.id)}
-              record={profile?.best[stage.id]}
-            />
-          ))}
-        </div>
-      </section>
+      <p className="mt-8 rounded-2xl bg-white px-4 py-3 text-center text-xs text-slate-500 ring-1 ring-slate-200">
+        3레벨은 준비 중이에요. 조금만 기다려 주세요!
+      </p>
 
       {conceptOpen && <ConceptCard onClose={() => setConceptOpen(false)} />}
     </main>

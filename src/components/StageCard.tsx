@@ -3,9 +3,9 @@ import type { Stage, StageRecord } from '../types';
 import { formatDuration } from '../lib/format';
 
 const tierLabel: Record<number, string> = {
-  1: '1단계',
-  2: '2단계',
-  3: '3단계',
+  1: '1레벨',
+  2: '2레벨',
+  3: '3레벨',
 };
 
 export function Stars({ count, size = 'text-base' }: { count: number; size?: string }) {

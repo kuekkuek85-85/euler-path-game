@@ -83,7 +83,7 @@ export function RankingTab({
 /** 탭 2 · 스테이지별 최단 시간 — 스테이지를 고르고 상위 10명. */
 export function StageTimeTab({ masking }: { masking: boolean }) {
   const drawStages = useMemo(() => STAGES.filter((s) => s.type === 'DRAW'), []);
-  const [stageId, setStageId] = useState(drawStages[0]?.id ?? 'S01');
+  const [stageId, setStageId] = useState(drawStages[0]?.id ?? '');
   const [rows, setRows] = useState<StageTimeRow[]>([]);
 
   useEffect(() => subscribeStageTimes(stageId, 10, setRows), [stageId]);

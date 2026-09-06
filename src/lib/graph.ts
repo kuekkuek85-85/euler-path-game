@@ -304,11 +304,8 @@ export function validateStage(stage: Stage): StageValidation {
         }
       }
     }
-    // tier 1 = 홀수점 0개(회로), tier 2 = 홀수점 2개(경로)
-    if (stage.tier === 1 && status !== 'circuit')
-      problems.push(`tier 1은 홀수점 0개여야 하는데 ${odd.length}개입니다.`);
-    if (stage.tier === 2 && status !== 'path')
-      problems.push(`tier 2는 홀수점 2개여야 하는데 ${odd.length}개입니다.`);
+    // tier는 이제 난이도 레벨이라 홀수점 개수와 묶이지 않는다.
+    // 도형별로 기대하는 홀수점 개수는 stages.test.ts의 대조표가 지킨다.
   }
 
   // 두붓 이상 — 선언한 붓 수가 실제 최소 붓 수와 정확히 같아야 한다.

@@ -11,19 +11,17 @@ export const STAGE_BY_ID: Record<string, Stage> = Object.fromEntries(
 /** 모든 스테이지가 고정 데이터다. 전부 정적 검증 대상. */
 export const STATIC_STAGES = STAGES;
 
+/** 대시보드·통계에서 쓰는 "전체 스테이지". 지금은 20개 전부가 본편이다. */
 export const MAIN_STAGES = STAGES.filter((stage) => !stage.bonus);
-const isSingleStroke = (stage: Stage) => (stage.maxStrokes ?? 1) === 1;
 
-/** 보너스 중 한붓 회로형 (판별 미션 + 도전 회로 B01~B06). */
-export const BONUS_STAGES = STAGES.filter(
-  (stage) => stage.bonus && isSingleStroke(stage) && stage.tier !== 2,
-);
-/** 홀수점 2개 — 시작점을 찾아야 하는 도전 경로 (D01~D03). */
-export const PATH_CHALLENGE_STAGES = STAGES.filter(
-  (stage) => stage.bonus && isSingleStroke(stage) && stage.tier === 2,
-);
-/** 두붓 이상이 필요한 응용 스테이지 (C01~C04). */
-export const MULTI_STROKE_STAGES = STAGES.filter((stage) => (stage.maxStrokes ?? 1) > 1);
+/** 레벨별 묶음. 3레벨은 아직 비어 있고, 데이터를 추가하면 저절로 채워진다. */
+export const STAGES_BY_LEVEL: Record<1 | 2 | 3, Stage[]> = {
+  1: STAGES.filter((stage) => stage.tier === 1),
+  2: STAGES.filter((stage) => stage.tier === 2),
+  3: STAGES.filter((stage) => stage.tier === 3),
+};
+
+export const LEVELS = [1, 2, 3] as const;
 
 export function getStage(id: string): Stage | undefined {
   return STAGE_BY_ID[id];

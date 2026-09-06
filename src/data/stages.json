@@ -7039,7 +7039,7 @@
     "tier": 6,
     "name": "성곽",
     "type": "DRAW",
-    "parTimeSec": 80,
+    "parTimeSec": 84,
     "nodes": [
       {
         "id": "T",
@@ -7197,9 +7197,14 @@
         "id": "e20",
         "from": "E",
         "to": "H"
+      },
+      {
+        "id": "e21",
+        "from": "E",
+        "to": "J"
       }
     ],
-    "clearMessage": "가운데 왼쪽 점이 다섯 갈래! 거기서 출발해야 풀려요.",
+    "clearMessage": "가운데 두 점이 홀수점! 다섯 갈래나 일곱 갈래 점에서 출발해야 풀려요.",
     "unlockedBy": "L6-06"
   },
   {

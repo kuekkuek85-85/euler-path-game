@@ -152,6 +152,45 @@ export function validStartNodes(graph: GraphLike): string[] {
   return [];
 }
 
+/** 시작점 힌트의 단계 수. */
+export const HINT_LEVELS = 3;
+
+/**
+ * 단계별로 몇 개를 반짝일지. 1단계는 넓게, 3단계는 두 개만.
+ * 점이 서너 개뿐인 작은 도형에서는 1·2단계가 같아질 수 있다 — 좁힐 여지가 없으니
+ * 억지로 벌리지 않는다.
+ */
+function hintSizes(nodeCount: number): [number, number, number] {
+  const third = Math.min(2, nodeCount);
+  const second = Math.min(nodeCount, Math.max(third + 1, Math.round(nodeCount * 0.4)));
+  const first = Math.min(nodeCount, Math.max(second + 1, Math.round(nodeCount * 0.65)));
+  return [first, second, third];
+}
+
+/**
+ * 시작점 힌트. 1→3단계로 갈수록 후보를 좁힌다.
+ *
+ * - 세 단계는 포함 관계다: 3단계 ⊆ 2단계 ⊆ 1단계. 좁아질 뿐 답이 밖으로 밀려나지 않는다.
+ * - 어느 단계든 실제로 출발할 수 있는 점을 반드시 담는다.
+ * - 홀수점이 2개인 도형이면 3단계는 정확히 그 두 점이다 — 수업에서 가르치는 결론 그대로다.
+ * - 홀수점이 없는 회로형은 아무 점에서나 출발할 수 있다. 3단계의 두 점은 "이 둘만 된다"가
+ *   아니라 "여기서 시작해 보라"는 예시이고, 그 차이는 화면 안내 문구가 말해 준다.
+ *
+ * 무작위를 쓰지 않는다. 같은 스테이지·같은 단계면 언제나 같은 답이라 다시 그리기를 해도
+ * 힌트가 흔들리지 않고, 테스트로 고정할 수 있다.
+ */
+export function startHintCandidates(graph: GraphLike, level: number): string[] {
+  const bounded = Math.min(Math.max(Math.trunc(level), 1), HINT_LEVELS);
+  const take = hintSizes(graph.nodes.length)[bounded - 1];
+  const valid = new Set(validStartNodes(graph));
+  // 출발 가능한 점을 앞에, 나머지를 뒤에 둔 뒤 앞에서부터 잘라 낸다.
+  const ranked = [
+    ...graph.nodes.filter((n) => valid.has(n.id)),
+    ...graph.nodes.filter((n) => !valid.has(n.id)),
+  ];
+  return ranked.slice(0, take).map((n) => n.id);
+}
+
 /**
  * Hierholzer 알고리즘. 모든 간선을 한 번씩 지나는 순서를 edge id 배열로 돌려준다.
  * 해가 없거나 startNode에서 출발할 수 없으면 null.

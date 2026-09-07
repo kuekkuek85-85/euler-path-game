@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { GameStatus, Stage } from '../types';
-import { adjacency, availableEdges, hintEdges, validStartNodes } from '../lib/graph';
+import { HINT_LEVELS, adjacency, startHintCandidates, validStartNodes } from '../lib/graph';
+import { HINT_PENALTIES } from '../lib/scoring';
 
 /**
  * 'resume' — 손을 뗐다가 현재 점을 다시 누른 경우. 잘못한 것이 아니므로
@@ -23,6 +24,12 @@ export interface GameEngine {
   elapsedMs: () => number;
   /** 힌트로 반짝일 노드 id. hint()를 부르면 채워지고, clearHint()로 지운다. */
   hintNodes: string[];
+  /** 지금까지 받은 힌트 단계 (0~3). hintCount와 같은 값이다. */
+  hintLevel: number;
+  /** 다음 힌트를 받을 때 깎이는 점수. 다 썼으면 0. */
+  nextHintPenalty: number;
+  /** 힌트를 더 받을 수 있는지. */
+  canHint: boolean;
   /** 시작 전 안내용 — 이 스테이지에서 출발할 수 있는 점들. */
   startCandidates: string[];
   /** 지금 몇 번째 붓인지 (1부터). */
@@ -40,7 +47,7 @@ export interface GameEngine {
   canReach: (nodeId: string) => boolean;
 }
 
-const MAX_HINTS = 3;
+const MAX_HINTS = HINT_LEVELS;
 
 /**
  * 한 스테이지의 진행 상태. PRD 8.2의 GameState를 그대로 담고
@@ -102,12 +109,14 @@ export function useGameEngine(stage: Stage): GameEngine {
     (nodeId: string): MoveResult => {
       // 붓을 뗀 뒤에는 다시하기 전까지 아무 입력도 받지 않는다.
       if (strokeBroken) return 'rejected';
-      setHintNodes([]);
       if (currentNode === null) {
         // 아직 지날 선이 남아 있는 점에서만 시작할 수 있다.
         // 두 번째 붓에서 이미 다 쓴 점을 골라 갇히는 일을 막는다.
         const open = (adj.get(nodeId) ?? []).some((i) => !usedEdgeSet.has(i.edgeId));
         if (!open) return 'rejected';
+        // 힌트는 "어디서 시작할까"에 답하는 것이라, 시작하고 나면 역할이 끝난다.
+        // 빗나간 터치(rejected)에는 지우지 않는다 — 점수를 주고 산 안내를 오조작으로 잃지 않게.
+        setHintNodes([]);
         nodeHistory.current = [nodeId];
         setCurrentNode(nodeId);
         return 'start';
@@ -182,26 +191,24 @@ export function useGameEngine(stage: Stage): GameEngine {
     nodeHistory.current = [];
     setCurrentNode(null);
     setUsedEdges([]);
-    setHintNodes([]);
+    // 이미 점수를 주고 받은 힌트는 다시 그릴 때도 그대로 남겨 준다.
+    setHintNodes(hintCount > 0 ? startHintCandidates(stage, hintCount) : []);
     setStrokeBroken(false);
     setStrokeIndex(1);
     setStrokeStartAt(0);
     setResetCount((c) => c + 1);
-  }, []);
+  }, [hintCount, stage]);
 
-  /** 다음에 갈 수 있는 점을 반짝인다. 스테이지당 3회, 회당 50점 차감. */
+  /**
+   * 시작점 힌트를 한 단계 더 받는다 (2026-09-07 작성자 요청).
+   * 1단계는 넓게, 2단계는 좁혀서, 3단계는 두 점만 반짝인다. 단계마다 감점이 커진다.
+   */
   const hint = useCallback(() => {
     if (hintCount >= MAX_HINTS) return;
-    if (currentNode === null) {
-      const candidates = startCandidates.length > 0 ? startCandidates : stage.nodes.map((n) => n.id);
-      setHintNodes(candidates);
-    } else {
-      const options = hintEdges(stage, currentNode, usedEdges);
-      const targets = options.length > 0 ? options : availableEdges(stage, currentNode, usedEdges);
-      setHintNodes([...new Set(targets.map((o) => o.to))]);
-    }
-    setHintCount((c) => c + 1);
-  }, [currentNode, hintCount, stage, startCandidates, usedEdges]);
+    const level = hintCount + 1;
+    setHintNodes(startHintCandidates(stage, level));
+    setHintCount(level);
+  }, [hintCount, stage]);
 
   const clearHint = useCallback(() => setHintNodes([]), []);
 
@@ -219,6 +226,9 @@ export function useGameEngine(stage: Stage): GameEngine {
     startedAt,
     elapsedMs,
     hintNodes,
+    hintLevel: hintCount,
+    nextHintPenalty: hintCount >= MAX_HINTS ? 0 : HINT_PENALTIES[hintCount],
+    canHint: hintCount < MAX_HINTS,
     startCandidates,
     strokeIndex,
     maxStrokes,

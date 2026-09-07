@@ -9,11 +9,13 @@ import {
 } from '../data/stages';
 import type { Stage, StageLevel } from '../types';
 import {
+  HINT_LEVELS,
   eulerStatus,
   minStrokes,
   oddNodes,
   solve,
   solveInStrokes,
+  startHintCandidates,
   validStartNodes,
   validateStage,
 } from './graph';
@@ -414,4 +416,40 @@ describe('도형 생성기 (3레벨 도형을 뽑을 때 쓰는 설계용 도구
       expect(node.y).toBeLessThanOrEqual(100);
     }
   });
+});
+
+describe('시작점 힌트가 60개 스테이지 모두에서 쓸모 있다', () => {
+  it.each(STAGES.filter((s) => s.type === 'DRAW').map((s) => [s.id, s] as const))(
+    '%s — 세 단계가 좁아지고, 어느 단계에나 진짜 시작점이 있다',
+    (_id, stage) => {
+      const valid = validStartNodes(stage);
+      const levels = Array.from({ length: HINT_LEVELS }, (_, i) =>
+        startHintCandidates(stage, i + 1),
+      );
+
+      for (const candidates of levels) {
+        // 힌트가 가리킨 점은 모두 실제 도형의 점이어야 한다
+        for (const id of candidates) {
+          expect(stage.nodes.some((n) => n.id === id)).toBe(true);
+        }
+        // 헛다리를 짚게 하지 않는다 — 언제나 답이 하나는 들어 있다
+        expect(candidates.some((id) => valid.includes(id))).toBe(true);
+      }
+
+      // 단계가 올라가면 후보가 늘지 않고, 좁아질 뿐 답이 밖으로 나가지 않는다
+      expect(levels[1].length).toBeLessThanOrEqual(levels[0].length);
+      expect(levels[2].length).toBeLessThanOrEqual(levels[1].length);
+      expect(levels[1].every((id) => levels[0].includes(id))).toBe(true);
+      expect(levels[2].every((id) => levels[1].includes(id))).toBe(true);
+
+      // 3단계는 두 개만 (점이 1개뿐인 도형은 없다)
+      expect(levels[2]).toHaveLength(2);
+
+      // 홀수점이 2개인 도형이면 3단계가 곧 정답이다
+      const odd = oddNodes(stage);
+      if (odd.length === 2) {
+        expect([...levels[2]].sort()).toEqual([...odd].sort());
+      }
+    },
+  );
 });

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { Stage } from '../types';
 import { getStage } from '../data/stages';
-import { oddNodes } from '../lib/graph';
+import { oddNodes, startHintCandidates } from '../lib/graph';
 import { scoreForStage } from '../lib/scoring';
 import { formatClock } from '../lib/format';
 import { useGameEngine } from '../hooks/useGameEngine';
@@ -21,6 +21,25 @@ import { JudgeBoard } from './JudgeBoard';
  * 버튼을 찾아 누르게 하지 않는다 (PRD 7.4).
  */
 const BROKEN_AUTO_RESET_MS = 3000;
+
+/** 힌트 단계별로 확인창에 띄우는 설명. 학생이 무엇을 사는지 알고 누르게 한다. */
+const HINT_STEP_TEXT = [
+  '시작점이 들어 있는 넓은 범위를 반짝여 줘요.',
+  '범위를 더 좁혀서 반짝여 줘요.',
+  '시작점 후보를 두 개만 콕 집어 반짝여 줘요.',
+];
+
+/** 힌트를 받은 뒤 띄우는 안내. 회로형(홀수점 0개)은 "어디서나 된다"는 것이 핵심이다. */
+function hintMessage(level: number, oddCount: number, shown: number): string {
+  if (oddCount === 0) {
+    return level >= 3
+      ? '이 도형은 홀수점이 없어서 사실 어느 점에서 시작해도 돼요. 반짝이는 두 점 중 하나로 해 볼까요?'
+      : `이 도형은 홀수점이 없어서 어느 점에서 시작해도 돼요. 반짝이는 ${shown}개 중에서 골라 보세요.`;
+  }
+  if (level >= 3) return '반짝이는 두 점이 시작점이에요. 선이 홀수 개 모인 점이죠.';
+  if (level === 2) return `범위를 좁혔어요. 반짝이는 ${shown}개 안에 시작점이 있어요.`;
+  return `반짝이는 ${shown}개 안에 시작점이 있어요.`;
+}
 
 export function Play() {
   const { stageId = '' } = useParams();
@@ -46,6 +65,8 @@ function DrawBoard({ stage }: { stage: Stage }) {
   const [shake, setShake] = useState(false);
   const [toast, setToast] = useState<{ id: number; message: string; tone: ToastTone } | null>(null);
   const [stuckStreak, setStuckStreak] = useState(0);
+  /** 힌트 확인창. 실수로 눌러서 점수를 잃지 않도록 한 번 물어본다. */
+  const [hintAsk, setHintAsk] = useState(false);
   const submitted = useRef(false);
   const wasStuck = useRef(false);
   /** 같은 문구가 다시 떠도 3초를 새로 세도록 매번 다른 id를 붙인다. */
@@ -56,6 +77,19 @@ function DrawBoard({ stage }: { stage: Stage }) {
     setToast({ id: toastSeq.current, message, tone });
   }, []);
   const dismissToast = useCallback(() => setToast(null), []);
+
+  const oddCount = useMemo(() => oddNodes(stage).length, [stage]);
+
+  /** 확인창에서 "받을게요"를 눌렀을 때. 여기서만 감점이 일어난다. */
+  const takeHint = useCallback(() => {
+    setHintAsk(false);
+    if (!engine.canHint) return;
+    const level = engine.hintLevel + 1;
+    const shown = startHintCandidates(stage, level).length;
+    engine.hint();
+    navigator.vibrate?.(15);
+    showToast(hintMessage(level, oddCount, shown), 'info');
+  }, [engine, oddCount, showToast, stage]);
 
   // 홀수점 보기는 기본으로 숨긴다. 교사가 "홀수점 보기 열기"를 켰을 때만 나타난다
   // (수업 운영표의 "정리 1 — 홀수점 개념 설명" 시점에 여는 용도).
@@ -106,13 +140,14 @@ function DrawBoard({ stage }: { stage: Stage }) {
     const streak = stuckStreak + 1;
     setStuckStreak(streak);
     navigator.vibrate?.([15, 40, 15]);
-    const oddCount = oddNodes(stage).length;
-    if (streak >= 3 && oddCount === 2) {
+    if (streak >= 3 && engine.canHint) {
+      showToast('막히면 아래 "시작점 힌트"를 눌러 보세요. 점수는 조금 깎여요.', 'warn');
+    } else if (streak >= 3 && oddCount === 2) {
       showToast('시작점을 바꿔볼까요? 선이 홀수 개 모인 점에서 출발해 보세요.', 'warn');
     } else {
       showToast('이 길로는 다 못 지나가요. 다시 그려 볼까요?', 'warn');
     }
-  }, [engine.status, showToast, stage, stuckStreak]);
+  }, [engine.canHint, engine.status, oddCount, showToast, stuckStreak]);
 
   // 붓을 뗐을 때 — 안내는 캔버스 위 오버레이가 하므로 진동만 준다.
   // 3초 뒤에는 오버레이를 스스로 걷고 판을 처음으로 되돌린다 (작성자 요청).
@@ -318,20 +353,79 @@ function DrawBoard({ stage }: { stage: Stage }) {
       </div>
 
       {/*
-        힌트·다시하기 버튼은 학생이 스스로 고민하도록 감췄다 (2026-09-01 작성자 결정).
+        다시하기 버튼은 학생이 스스로 고민하도록 여전히 감춰 둔다 (2026-09-01 작성자 결정).
         붓을 뗐을 때의 "다시 그리기"는 캔버스 오버레이에 남아 있어 복구는 언제든 가능하다.
+        힌트는 2026-09-07 작성자 요청으로 되살렸다 — 단계마다 감점이 있고, 누르기 전에
+        얼마가 깎이는지 버튼과 확인창에서 보여 준다.
         홀수점 보기는 교사가 "홀수점 보기 열기"를 켰을 때만 나타난다 — 수업 운영표의
         "정리 1 · 홀수점 개념 설명" 시점에 여는 용도다.
       */}
-      {oddViewAllowed && (
-        <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
+      <div className="mt-3 landscape:mt-0 landscape:w-44 landscape:shrink-0">
+        <div
+          className={`grid gap-2 landscape:grid-cols-1 ${oddViewAllowed ? 'grid-cols-2' : 'grid-cols-1'}`}
+        >
           <ControlButton
-            label="홀수점 보기"
-            sub={oddView ? '켜짐' : '꺼짐'}
-            icon="◉"
-            onClick={() => setOddView((v) => !v)}
-            active={oddView}
+            label="시작점 힌트"
+            sub={
+              engine.canHint
+                ? `${engine.hintLevel + 1}단계 · -${engine.nextHintPenalty}점`
+                : '다 썼어요 (3/3)'
+            }
+            icon="💡"
+            onClick={() => setHintAsk(true)}
+            disabled={counting || !engine.canHint}
+            highlight={engine.hintLevel > 0}
           />
+          {oddViewAllowed && (
+            <ControlButton
+              label="홀수점 보기"
+              sub={oddView ? '켜짐' : '꺼짐'}
+              icon="◉"
+              onClick={() => setOddView((v) => !v)}
+              active={oddView}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* 힌트 확인창 — 실수로 눌러 점수를 잃는 일을 막는다. 감점은 "받을게요"에서만 일어난다. */}
+      {hintAsk && engine.canHint && (
+        <div
+          className="fixed inset-0 z-30 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="hint-ask-title"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl">
+            <p className="text-center text-3xl" aria-hidden="true">
+              💡
+            </p>
+            <h2 id="hint-ask-title" className="mt-2 text-center text-lg font-bold text-slate-900">
+              시작점 힌트 {engine.hintLevel + 1}단계
+            </h2>
+            <p className="mt-1 text-center text-sm leading-relaxed text-slate-600">
+              {HINT_STEP_TEXT[engine.hintLevel]}
+            </p>
+            <p className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-center text-sm font-semibold text-rose-700">
+              점수에서 {engine.nextHintPenalty}점이 깎여요
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setHintAsk(false)}
+                className="min-h-[48px] rounded-2xl bg-slate-100 text-base font-bold text-slate-700"
+              >
+                안 받을래요
+              </button>
+              <button
+                type="button"
+                onClick={takeHint}
+                className="min-h-[48px] rounded-2xl bg-amber-500 text-base font-bold text-white"
+              >
+                받을게요
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

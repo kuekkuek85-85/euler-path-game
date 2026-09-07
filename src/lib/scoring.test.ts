@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SCORE, MIN_SCORE, calcJudgeScore, calcScore } from './scoring';
+import {
+  HINT_PENALTIES,
+  MAX_SCORE,
+  MIN_SCORE,
+  calcJudgeScore,
+  calcScore,
+  hintPenalty,
+} from './scoring';
 
 const clean = {
   edgeCount: 8,
@@ -42,7 +49,7 @@ describe('calcScore (PRD 3.4)', () => {
 
   it('되돌리기·힌트·재시작 차감을 합산한다', () => {
     const result = calcScore({ ...clean, undoCount: 3, hintCount: 2, resetCount: 1 });
-    expect(result.penalty).toBe(3 * 10 + 2 * 50 + 1 * 20);
+    expect(result.penalty).toBe(3 * 10 + (20 + 40) + 1 * 20);
   });
 
   it('점수는 50 아래로 내려가지 않는다', () => {
@@ -63,6 +70,35 @@ describe('calcScore (PRD 3.4)', () => {
 
   it('기준시간과 정확히 같으면 아직 기준시간 안이다', () => {
     expect(calcScore({ ...clean, elapsedMs: 50_000 }).stars).toBe(3);
+  });
+});
+
+describe('힌트 감점 (2026-09-07 3단계 힌트)', () => {
+  it('단계가 올라갈수록 감점이 커진다', () => {
+    expect([...HINT_PENALTIES]).toEqual([20, 40, 80]);
+    expect(HINT_PENALTIES[0]).toBeLessThan(HINT_PENALTIES[1]);
+    expect(HINT_PENALTIES[1]).toBeLessThan(HINT_PENALTIES[2]);
+  });
+
+  it('누적 감점은 받은 단계까지의 합이다', () => {
+    expect(hintPenalty(0)).toBe(0);
+    expect(hintPenalty(1)).toBe(20);
+    expect(hintPenalty(2)).toBe(60);
+    expect(hintPenalty(3)).toBe(140);
+  });
+
+  it('한 번도 안 받으면 별 3개를 지킬 수 있다', () => {
+    expect(calcScore({ ...clean, hintCount: 0 }).stars).toBe(3);
+    expect(calcScore({ ...clean, hintCount: 1 }).stars).toBe(2);
+  });
+
+  it('음수나 소수가 들어와도 깨지지 않는다', () => {
+    expect(hintPenalty(-1)).toBe(0);
+    expect(hintPenalty(1.9)).toBe(20);
+  });
+
+  it('3단계를 넘겨도 마지막 값으로 이어 계산한다', () => {
+    expect(hintPenalty(4)).toBe(140 + 80);
   });
 });
 

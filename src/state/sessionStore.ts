@@ -20,6 +20,11 @@ export interface SessionValue {
    * 대신 "기록 불러오는 중"을 보여준다 (2026-09-11 사고).
    */
   profileLoading: boolean;
+  /**
+   * 기록을 끝내 못 불러온 채로 들어온 상태.
+   * 화면을 막지는 않되(수업이 멈추면 안 된다) 총점이 실제와 다를 수 있음을 알린다.
+   */
+  profileStale: boolean;
   remoteEnabled: boolean;
   signIn: (studentNo: string, name: string) => Promise<void>;
   signOut: () => void;

@@ -19,7 +19,7 @@ const levelHeadings: Record<number, { title: string; hint: string }> = {
 
 /** 두 화면이 함께 쓰는 머리말 — 학생 정보와 저장 대기 배지. */
 function StudentHeader({ title, back }: { title: string; back?: string }) {
-  const { identity, profile, signOut, pending } = useSession();
+  const { identity, profile, signOut, pending, profileStale } = useSession();
   if (!identity) return null;
   return (
     <>
@@ -52,6 +52,14 @@ function StudentHeader({ title, back }: { title: string; back?: string }) {
           학번 변경
         </button>
       </header>
+
+      {profileStale && (
+        <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-2 text-xs font-semibold leading-relaxed text-rose-800">
+          지금까지의 기록을 불러오지 못했어요. <b>여기 보이는 총점은 실제와 다를 수 있어요.</b>
+          <br />
+          지금 푸는 것은 저장되니 그냥 이어서 하고, <b>선생님께 알려 주세요.</b>
+        </p>
+      )}
 
       {pending > 0 && (
         <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800">

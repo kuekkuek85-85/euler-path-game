@@ -19,6 +19,24 @@ import { type Identity, SessionContext, type SessionValue } from './sessionStore
 
 const savedIdentity = () => readJson<Identity | null>(STORAGE_KEYS.identity, null);
 
+/**
+ * 기록 불러오기를 이만큼 기다렸는데도 안 끝나면 학생을 들여보낸다 (2026-09-11 수업 중 사고).
+ *
+ * 학교 망에서 Firestore **쓰기는 되는데 읽기(getDoc)가 영영 안 끝나는** 경우가 있었다.
+ * 그때 "불러오는 중" 화면으로 막아 두면 학생이 수업 내내 아무것도 못 한다.
+ * 못 불러온 것보다 못 들어가는 것이 훨씬 나쁘다 — 기다리다 안 되면 열어 준다.
+ */
+const PROFILE_LOAD_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    work,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<Identity | null>(savedIdentity);
   /**
@@ -40,6 +58,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * 1레벨부터 다시 푼다. 실제로 그런 일이 있었다.
    */
   const [profileLoading, setProfileLoading] = useState<boolean>(() => savedIdentity() !== null);
+  /** 끝내 못 불러왔다. 화면은 열어 주되 경고를 띄운다. */
+  const [profileStale, setProfileStale] = useState(false);
 
   useEffect(() => subscribeConfig(setConfig), []);
   useEffect(() => onPendingChange(setPending), []);
@@ -64,20 +84,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const authUid = await ensureAnonymousAuth();
         if (cancelled) return;
         setUid(authUid);
-        const { profile: next, fromServer } = await ensureStudent({
-          studentNo: identity.studentNo,
-          name: identity.name,
-          classId: classIdOf(identity.studentNo),
-          uid: authUid,
-        });
+        const result = await withTimeout(
+          ensureStudent({
+            studentNo: identity.studentNo,
+            name: identity.name,
+            classId: classIdOf(identity.studentNo),
+            uid: authUid,
+          }),
+          PROFILE_LOAD_TIMEOUT_MS,
+        );
         if (cancelled) return;
+        if (!result) {
+          // 시간 초과. 막지 않고 들여보낸다 — 배너로 알리고 아래 재시도가 계속 붙는다.
+          setProfile((current) => current ?? readLocalProfile(identity.studentNo));
+          setProfileLoading(false);
+          setProfileStale(true);
+          return;
+        }
         // 서버를 못 읽었는데 로컬 기록도 없다면, 0점짜리 프로필을 들이밀지 않는다.
-        // 화면은 "기록 불러오는 중"에 머물고, 아래 재시도가 이어 붙는다.
-        if (fromServer || next.clearedCount > 0) setProfile(next);
-        setProfileLoading(!fromServer);
+        if (result.fromServer || result.profile.clearedCount > 0) setProfile(result.profile);
+        setProfileLoading(false);
+        setProfileStale(!result.fromServer);
       } catch (error) {
         console.warn('[session] 기록을 불러오지 못했습니다.', error);
-        if (!cancelled) setProfileLoading(true);
+        if (cancelled) return;
+        setProfile((current) => current ?? readLocalProfile(identity.studentNo));
+        setProfileLoading(false);
+        setProfileStale(true);
       }
     })();
     return () => {
@@ -90,13 +123,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * 학생을 "다시 로그인해 보라"는 안내에 맡기지 않는다.
    */
   useEffect(() => {
-    if (!identity || !profileLoading) return;
+    if (!identity || (!profileLoading && !profileStale)) return;
     const timer = window.setInterval(() => {
       syncedFor.current = null;
       setIdentity((current) => (current ? { ...current } : current));
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [identity, profileLoading]);
+  }, [identity, profileLoading, profileStale]);
 
   const signIn = useCallback(async (studentNo: string, name: string) => {
     setSigningIn(true);
@@ -111,19 +144,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setIdentity({ studentNo, name: trimmed });
 
       setProfileLoading(true);
+      setProfileStale(false);
       const authUid = await ensureAnonymousAuth();
       setUid(authUid);
-      const { profile: next, fromServer } = await ensureStudent({
-        studentNo,
-        name: trimmed,
-        classId: classIdOf(studentNo),
-        uid: authUid,
-      });
-      if (fromServer || next.clearedCount > 0) setProfile(next);
-      setProfileLoading(!fromServer);
+      const result = await withTimeout(
+        ensureStudent({
+          studentNo,
+          name: trimmed,
+          classId: classIdOf(studentNo),
+          uid: authUid,
+        }),
+        PROFILE_LOAD_TIMEOUT_MS,
+      );
+      if (!result) {
+        setProfile((current) => current ?? readLocalProfile(studentNo));
+        setProfileLoading(false);
+        setProfileStale(true);
+        return;
+      }
+      if (result.fromServer || result.profile.clearedCount > 0) setProfile(result.profile);
+      setProfileLoading(false);
+      setProfileStale(!result.fromServer);
     } catch (error) {
       console.warn('[session] 로그인 중 기록을 불러오지 못했습니다.', error);
-      setProfileLoading(true);
+      setProfile((current) => current ?? readLocalProfile(studentNo));
+      setProfileLoading(false);
+      setProfileStale(true);
     } finally {
       setSigningIn(false);
     }
@@ -134,6 +180,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setIdentity(null);
     setProfile(null);
     setProfileLoading(false);
+    setProfileStale(false);
   }, []);
 
   const submitResult = useCallback<SessionValue['submitResult']>(
@@ -195,6 +242,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pending,
       signingIn,
       profileLoading,
+      profileStale,
       remoteEnabled: firebaseEnabled,
       signIn,
       signOut,
@@ -210,6 +258,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pending,
       profile,
       profileLoading,
+      profileStale,
       signIn,
       signOut,
       signingIn,

@@ -319,9 +319,10 @@ export async function flushQueue(): Promise<void> {
       }
 
       // 2) 학생 문서(총점·최고 기록). 이쪽이 진짜 중요한 저장이다.
-      try {
-        await setDoc(
-          doc(db, 'students', item.profile.studentNo),
+      const ref = doc(db, 'students', item.profile.studentNo);
+      const writeProfile = () =>
+        setDoc(
+          ref,
           {
             studentNo: item.profile.studentNo,
             name: item.profile.name,
@@ -333,6 +334,41 @@ export async function flushQueue(): Promise<void> {
           },
           { merge: true },
         );
+
+      try {
+        try {
+          await writeProfile();
+        } catch (error) {
+          if (!isPermanentFailure(error)) throw error;
+          /*
+            2026-09-11 기록 손실의 진짜 원인.
+
+            학생 문서가 아직 없으면 merge 쓰기도 Firestore가 **create로 처리**한다.
+            그런데 보안 규칙의 create 조건은 `totalScore == 0`이라, 한 판이라도 깬 뒤의
+            저장은 예외 없이 permission-denied가 된다. 아래 catch가 이를 "영구 실패"로
+            보고 큐에서 버렸고, 그 판은 영영 사라졌다. plays 로그에는 그런 조건이 없어
+            혼자만 남았다 — "로그는 있는데 점수는 없는" 학생이 그래서 생겼다.
+
+            그러니 버리기 전에 0점 문서를 먼저 만들고 한 번 더 보낸다.
+            문서가 이미 있다면 이 씨앗 쓰기는 점수를 낮추는 update라 규칙이 거부하는데,
+            그게 맞다 — 남의 기록을 0으로 밀지 않는다.
+          */
+          await setDoc(
+            ref,
+            {
+              studentNo: item.profile.studentNo,
+              name: item.profile.name,
+              classId: item.profile.classId,
+              totalScore: 0,
+              clearedCount: 0,
+              best: {},
+              createdAt: serverTimestamp(),
+              lastPlayedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+          await writeProfile();
+        }
       } catch (error) {
         if (!isPermanentFailure(error)) {
           console.warn('[repository] 기록 전송 실패 — 큐에 남겨 둡니다.', error);

@@ -67,11 +67,46 @@ function StudentHeader({ title, back }: { title: string; back?: string }) {
  * 미션이 60개로 늘면서 한 화면에 다 늘어놓으면 세로 스크롤이 너무 길어졌다.
  * 첫 화면은 레벨 6개만 보여주고, 미션은 `/stages/:level`에서 고른다.
  */
+/**
+ * 기록을 아직 못 불러왔을 때 보여주는 화면 (2026-09-11 사고).
+ *
+ * 예전에는 이 순간에도 레벨 카드를 그렸다. profile이 null이니 "총점 0점 · 클리어 0개"에
+ * 1레벨만 열린 모습이었고, 이미 30개를 깬 학생이 그 화면을 보면 기록이 날아간 줄 알고
+ * 1레벨부터 다시 풀었다. 기록은 서버에 멀쩡히 있었는데도.
+ * 그래서 "없음"과 "아직 못 불러옴"을 절대 같은 화면으로 그리지 않는다.
+ */
+function ProfileLoading({ name }: { name: string }) {
+  return (
+    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 pb-16 pt-5 text-center">
+      <p className="text-4xl" aria-hidden="true">
+        📡
+      </p>
+      <h1 className="mt-3 text-xl font-black text-slate-900">{name}님의 기록을 불러오는 중…</h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        잠시만 기다려 주세요. <b className="text-slate-800">처음부터 다시 풀지 않아도 돼요.</b>
+        <br />
+        지금까지 깬 미션은 그대로 남아 있어요.
+      </p>
+      <div
+        className="mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-slate-200"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-500" />
+      </div>
+      <p className="mt-4 text-xs text-slate-500">
+        인터넷이 느리면 몇 초 걸릴 수 있어요. 계속 이 화면이면 선생님께 알려 주세요.
+      </p>
+    </main>
+  );
+}
+
 export function StageSelect() {
-  const { identity, profile, config, isUnlocked } = useSession();
+  const { identity, profile, config, isUnlocked, profileLoading } = useSession();
   const [conceptOpen, setConceptOpen] = useState(false);
 
   if (!identity) return <Navigate to="/" replace />;
+  if (profileLoading && !profile) return <ProfileLoading name={identity.name} />;
 
   const next = nextStage(profile?.best);
   // 6레벨 60개가 전부다. 데이터가 없는 레벨은 애초에 카드도 만들지 않는다.
@@ -147,10 +182,11 @@ export function StageSelect() {
 /** F2-2 · 한 레벨의 미션 10개. 뒤로 가기로 레벨 선택 화면에 돌아간다. */
 export function LevelStages() {
   const { level: levelParam = '' } = useParams();
-  const { identity, profile, isUnlocked } = useSession();
+  const { identity, profile, isUnlocked, profileLoading } = useSession();
   const [conceptOpen, setConceptOpen] = useState(false);
 
   if (!identity) return <Navigate to="/" replace />;
+  if (profileLoading && !profile) return <ProfileLoading name={identity.name} />;
 
   const level = Number(levelParam) as StageLevel;
   const stages = LEVELS.includes(level) ? STAGES_BY_LEVEL[level] : [];

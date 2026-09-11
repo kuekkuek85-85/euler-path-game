@@ -14,6 +14,12 @@ export interface SessionValue {
   /** 저장 대기 중인 기록 수. 0보다 크면 "기록 저장 대기 중" 배지를 띄운다. */
   pending: number;
   signingIn: boolean;
+  /**
+   * 서버에서 기록을 아직 못 가져온 상태.
+   * 이때 화면이 "총점 0점 · 클리어 0개"로 보이면 학생은 기록이 날아간 줄 안다.
+   * 대신 "기록 불러오는 중"을 보여준다 (2026-09-11 사고).
+   */
+  profileLoading: boolean;
   remoteEnabled: boolean;
   signIn: (studentNo: string, name: string) => Promise<void>;
   signOut: () => void;

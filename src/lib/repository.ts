@@ -110,15 +110,37 @@ function normalizeProfile(studentNo: string, data: Record<string, unknown>): Stu
 }
 
 /**
+ * ensureStudent의 결과. `fromServer`가 false면 **서버 기록을 못 읽은 것**이고,
+ * 돌려준 profile은 로컬 기록이거나 빈 값이다 — 화면은 이를 "기록 없음"이 아니라
+ * "아직 못 불러옴"으로 다뤄야 한다 (2026-09-11 사고).
+ */
+export interface EnsureStudentResult {
+  profile: StudentProfile;
+  fromServer: boolean;
+}
+
+/** 교실 와이파이에서 한 번 실패했다고 포기하면 학생 기록이 통째로 안 보인다. */
+const READ_RETRIES = 3;
+const RETRY_DELAY_MS = 700;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * 학번으로 학생 문서를 확보한다. 이미 있으면 그 기록을 이어받고(기기 교체 대응, AC-05),
  * 없으면 0점 문서를 만든다. Firestore를 못 쓰면 localStorage 기록으로 되돌아간다.
+ *
+ * 2026-09-11 사고 이후로 지키는 것:
+ *  - 서버를 못 읽었을 때 **빈 프로필을 로컬에 덮어쓰지 않는다.** 예전에는 읽기 실패가
+ *    곧 "기록 없는 새 학생"이 되어, 기기에 남아 있던 기록까지 0으로 지워졌다.
+ *  - 읽기를 몇 번 더 시도한다. 25대가 한꺼번에 접속하는 교실에서 한 번 실패는 흔하다.
+ *  - 못 읽었으면 fromServer=false로 알려서, 화면이 0점짜리 새 학생처럼 그리지 않게 한다.
  */
 export async function ensureStudent(input: {
   studentNo: string;
   name: string;
   classId: string;
   uid: string | null;
-}): Promise<StudentProfile> {
+}): Promise<EnsureStudentResult> {
   const local = readLocalProfile(input.studentNo);
   const fallback: StudentProfile = local
     ? { ...local, name: input.name, classId: input.classId }
@@ -135,51 +157,65 @@ export async function ensureStudent(input: {
 
   const db = await getDb();
   if (!db) {
+    // 로컬 전용 모드. 여기서는 로컬이 곧 원본이라 덮어써도 잃을 것이 없다.
     writeLocalProfile(fallback);
-    return fallback;
+    return { profile: fallback, fromServer: true };
   }
 
-  try {
-    const { doc, getDoc, setDoc, serverTimestamp } = await firestoreApi();
-    const ref = doc(db, 'students', input.studentNo);
-    const snapshot = await getDoc(ref);
+  const { doc, getDoc, setDoc, serverTimestamp } = await firestoreApi();
+  const ref = doc(db, 'students', input.studentNo);
 
-    if (snapshot.exists()) {
-      const remote = normalizeProfile(input.studentNo, snapshot.data());
-      // 이름이 바뀌었으면 갱신하되 점수는 건드리지 않는다.
-      if (remote.name !== input.name || remote.classId !== input.classId) {
-        await setDoc(
-          ref,
-          { studentNo: input.studentNo, name: input.name, classId: input.classId },
-          { merge: true },
-        );
-        remote.name = input.name;
-        remote.classId = input.classId;
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= READ_RETRIES; attempt += 1) {
+    try {
+      const snapshot = await getDoc(ref);
+
+      if (snapshot.exists()) {
+        const remote = normalizeProfile(input.studentNo, snapshot.data());
+        // 이름이 바뀌었으면 갱신하되 점수는 건드리지 않는다.
+        // 이 쓰기가 실패해도 읽어 온 기록은 그대로 쓴다 — 이름 표기 때문에 기록을 잃지 않는다.
+        if (remote.name !== input.name || remote.classId !== input.classId) {
+          try {
+            await setDoc(
+              ref,
+              { studentNo: input.studentNo, name: input.name, classId: input.classId },
+              { merge: true },
+            );
+          } catch (error) {
+            console.warn('[repository] 이름·반 갱신에 실패했지만 기록은 그대로 씁니다.', error);
+          }
+          remote.name = input.name;
+          remote.classId = input.classId;
+        }
+        writeLocalProfile(remote);
+        return { profile: remote, fromServer: true };
       }
-      writeLocalProfile(remote);
-      return remote;
-    }
 
-    // 보안 규칙(§6.4)이 생성 시 totalScore == 0 을 요구한다.
-    const created: StudentProfile = { ...fallback, totalScore: 0, clearedCount: 0, best: {} };
-    await setDoc(ref, {
-      studentNo: created.studentNo,
-      name: created.name,
-      classId: created.classId,
-      uid: input.uid ?? null,
-      totalScore: 0,
-      clearedCount: 0,
-      best: {},
-      createdAt: serverTimestamp(),
-      lastPlayedAt: serverTimestamp(),
-    });
-    writeLocalProfile(created);
-    return created;
-  } catch (error) {
-    console.warn('[repository] 학생 문서를 읽지 못해 로컬 기록으로 진행합니다.', error);
-    writeLocalProfile(fallback);
-    return fallback;
+      // 서버에 정말 없는 학생. 보안 규칙(§6.4)이 생성 시 totalScore == 0 을 요구한다.
+      const created: StudentProfile = { ...fallback, totalScore: 0, clearedCount: 0, best: {} };
+      await setDoc(ref, {
+        studentNo: created.studentNo,
+        name: created.name,
+        classId: created.classId,
+        uid: input.uid ?? null,
+        totalScore: 0,
+        clearedCount: 0,
+        best: {},
+        createdAt: serverTimestamp(),
+        lastPlayedAt: serverTimestamp(),
+      });
+      writeLocalProfile(created);
+      return { profile: created, fromServer: true };
+    } catch (error) {
+      lastError = error;
+      if (attempt < READ_RETRIES) await sleep(RETRY_DELAY_MS * attempt);
+    }
   }
+
+  // 여기까지 왔으면 서버 기록을 못 봤다. 로컬 기록이 있으면 그것으로 진행하되,
+  // **없다고 해서 빈 프로필을 로컬에 쓰지는 않는다.** 그 한 줄이 기록을 지웠다.
+  console.warn('[repository] 학생 문서를 읽지 못했습니다. 기록을 덮어쓰지 않습니다.', lastError);
+  return { profile: fallback, fromServer: false };
 }
 
 /**

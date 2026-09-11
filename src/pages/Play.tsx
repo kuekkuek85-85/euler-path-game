@@ -43,11 +43,14 @@ function hintMessage(level: number, oddCount: number, shown: number): string {
 
 export function Play() {
   const { stageId = '' } = useParams();
-  const { identity, isUnlocked } = useSession();
+  const { identity, isUnlocked, profile, profileLoading } = useSession();
   const stage = getStage(stageId);
 
   if (!identity) return <Navigate to="/" replace />;
   if (!stage) return <Navigate to="/stages" replace />;
+  // 기록을 아직 못 불러왔으면 "안 열린 미션"으로 오해해 쫓아내지 않는다 (2026-09-11 사고).
+  // 목록으로 돌려보내면 그쪽에서 불러오기 화면을 보여준다.
+  if (profileLoading && !profile) return <Navigate to="/stages" replace />;
   if (!isUnlocked(stage.id)) return <Navigate to="/stages" replace />;
 
   if (stage.type === 'JUDGE') return <JudgeBoard stage={stage} />;

@@ -34,6 +34,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [uid, setUid] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [signingIn, setSigningIn] = useState(false);
+  /**
+   * 서버 기록을 아직 못 가져온 상태 (2026-09-11 사고).
+   * 이 동안 화면을 "총점 0점 · 클리어 0개"로 그리면 학생은 기록이 날아간 줄 알고
+   * 1레벨부터 다시 푼다. 실제로 그런 일이 있었다.
+   */
+  const [profileLoading, setProfileLoading] = useState<boolean>(() => savedIdentity() !== null);
 
   useEffect(() => subscribeConfig(setConfig), []);
   useEffect(() => onPendingChange(setPending), []);
@@ -52,22 +58,45 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     syncedFor.current = identity.studentNo;
 
     let cancelled = false;
+    setProfileLoading(true);
     void (async () => {
-      const authUid = await ensureAnonymousAuth();
-      if (cancelled) return;
-      setUid(authUid);
-      const next = await ensureStudent({
-        studentNo: identity.studentNo,
-        name: identity.name,
-        classId: classIdOf(identity.studentNo),
-        uid: authUid,
-      });
-      if (!cancelled) setProfile(next);
+      try {
+        const authUid = await ensureAnonymousAuth();
+        if (cancelled) return;
+        setUid(authUid);
+        const { profile: next, fromServer } = await ensureStudent({
+          studentNo: identity.studentNo,
+          name: identity.name,
+          classId: classIdOf(identity.studentNo),
+          uid: authUid,
+        });
+        if (cancelled) return;
+        // 서버를 못 읽었는데 로컬 기록도 없다면, 0점짜리 프로필을 들이밀지 않는다.
+        // 화면은 "기록 불러오는 중"에 머물고, 아래 재시도가 이어 붙는다.
+        if (fromServer || next.clearedCount > 0) setProfile(next);
+        setProfileLoading(!fromServer);
+      } catch (error) {
+        console.warn('[session] 기록을 불러오지 못했습니다.', error);
+        if (!cancelled) setProfileLoading(true);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [identity]);
+
+  /**
+   * 기록을 못 불러왔으면 계속 다시 시도한다. 교실 와이파이가 돌아오는 순간 이어진다.
+   * 학생을 "다시 로그인해 보라"는 안내에 맡기지 않는다.
+   */
+  useEffect(() => {
+    if (!identity || !profileLoading) return;
+    const timer = window.setInterval(() => {
+      syncedFor.current = null;
+      setIdentity((current) => (current ? { ...current } : current));
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [identity, profileLoading]);
 
   const signIn = useCallback(async (studentNo: string, name: string) => {
     setSigningIn(true);
@@ -81,15 +110,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       syncedFor.current = studentNo;
       setIdentity({ studentNo, name: trimmed });
 
+      setProfileLoading(true);
       const authUid = await ensureAnonymousAuth();
       setUid(authUid);
-      const next = await ensureStudent({
+      const { profile: next, fromServer } = await ensureStudent({
         studentNo,
         name: trimmed,
         classId: classIdOf(studentNo),
         uid: authUid,
       });
-      setProfile(next);
+      if (fromServer || next.clearedCount > 0) setProfile(next);
+      setProfileLoading(!fromServer);
+    } catch (error) {
+      console.warn('[session] 로그인 중 기록을 불러오지 못했습니다.', error);
+      setProfileLoading(true);
     } finally {
       setSigningIn(false);
     }
@@ -99,6 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     removeKey(STORAGE_KEYS.identity);
     setIdentity(null);
     setProfile(null);
+    setProfileLoading(false);
   }, []);
 
   const submitResult = useCallback<SessionValue['submitResult']>(
@@ -159,6 +194,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       uid,
       pending,
       signingIn,
+      profileLoading,
       remoteEnabled: firebaseEnabled,
       signIn,
       signOut,
@@ -173,6 +209,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isUnlocked,
       pending,
       profile,
+      profileLoading,
       signIn,
       signOut,
       signingIn,
